@@ -1,0 +1,36 @@
+:root {
+  /* 🎨 Màu sắc */
+  --color-primary: #1E40AF;   /* Màu chính (header, nút chính) */
+  --color-secondary: #3B82F6; /* Màu phụ (link, highlight) */
+  --color-bg: #F9FAFB;        /* Màu nền trang */
+  --color-text: #111827;      /* Màu chữ chính (đen đậm) */
+  --color-muted: #6B7280;     /* Màu chữ phụ (xám nhạt) */
+
+  /* 🔤 Font chữ */
+  --font-main: 'Inter', sans-serif;     /* Font mặc định cho body */
+  --font-heading: 'Poppins', sans-serif;/* Font cho tiêu đề */
+  --font-size-base: 1rem;    /* 16px – body text */
+  --font-size-lg: 1.25rem;   /* 20px – subheading */
+  --font-size-xl: 1.5rem;    /* 24px – heading chính */
+
+  /* 🟦 Bo góc (Border Radius) */
+  --radius-sm: 4px;   /* Bo góc nhỏ (button, input) */
+  --radius-md: 8px;   /* Bo góc vừa (card nhỏ) */
+  --radius-lg: 12px;  /* Bo góc lớn (card lớn, modal) */
+
+  /* 🌑 Đổ bóng (Box Shadow) */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);  /* Bóng nhẹ */
+  --shadow-md: 0 2px 6px rgba(0, 0, 0, 0.08);  /* Bóng vừa */
+  --shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.12); /* Bóng đậm */
+
+  /* 📏 Khoảng cách (Spacing) */
+  --space-xs: 0.25rem; /* 4px – padding nhỏ */
+  --space-sm: 0.5rem;  /* 8px – padding trung bình */
+  --space-md: 1rem;    /* 16px – khoảng cách chuẩn */
+  --space-lg: 1.5rem;  /* 24px – khoảng cách lớn */
+  --space-xl: 2rem;    /* 32px – khoảng cách rất lớn */
+
+  /* ⚡ Hiệu ứng (Transition) */
+  --transition-fast: 150ms ease-in-out; /* Nhanh */
+  --transition-base: 300ms ease-in-out; /* Chuẩn */
+}
