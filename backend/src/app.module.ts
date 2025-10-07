@@ -1,8 +1,8 @@
 import { Module } from '@nestjs/common';
 import { PrismaModule } from './prisma/prisma.module';
-import { StudentModule } from './modules/student/student.module';
+import { BlockchainModule } from './modules/blockchain/blockchain.module';
 
 @Module({
-  imports: [PrismaModule, StudentModule],
+  imports: [PrismaModule, BlockchainModule],
 })
 export class AppModule {}

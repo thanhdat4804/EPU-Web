@@ -1,92 +1,127 @@
 <template>
-  <div class="min-h-screen bg-gray-50">
-    <!-- Header -->
-    <header class="bg-white shadow">
-      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-20">
-        <!-- Logo -->
-        <div class="flex items-center space-x-3">
-          <img src="/logo.png" alt="Logo" class="h-12 w-12" />
-          <div>
-            <h1 class="text-xl font-bold text-blue-900">TRƯỜNG ĐẠI HỌC ĐIỆN LỰC</h1>
-            <p class="text-sm text-gray-600 italic">Electric Power University</p>
-          </div>
-        </div>
-        <!-- Menu -->
-        <nav class="hidden md:flex space-x-6">
-          <a href="#" class="text-gray-700 hover:text-blue-600 font-medium">Trang chủ</a>
-          <a href="#" class="text-gray-700 hover:text-blue-600 font-medium">Quy định</a>
-          <a href="#" class="text-gray-700 hover:text-blue-600 font-medium">Sinh viên</a>
-          <a href="#" class="text-gray-700 hover:text-blue-600 font-medium">Tin tức</a>
-        </nav>
-      </div>
-    </header>
+  <div class="p-8 max-w-2xl mx-auto bg-white rounded-xl shadow-md space-y-6">
+    <h1 class="text-2xl font-bold text-center">🎯 Auction DApp</h1>
 
-    <!-- Main Content -->
-    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-8 grid grid-cols-1 lg:grid-cols-3 gap-6">
-      <!-- Left content -->
-      <div class="lg:col-span-2 space-y-6">
-        <!-- Tin tức box -->
-        <section class="bg-white rounded-lg shadow p-6">
-          <h2 class="text-lg font-semibold text-blue-900 mb-4 border-b pb-2">Dành cho tân sinh viên khóa D20</h2>
-          <ul class="space-y-2">
-            <li class="group cursor-pointer transition duration-300 rounded-md px-3 py-2 hover:bg-blue-50 flex items-center justify-between">
-              <span class="text-gray-700 group-hover:text-blue-800 transition">📢 Thông báo chương trình nhập học trực tiếp...</span>
-              <span class="text-blue-600 opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition duration-300">→</span>
-            </li>
+    <!-- Auction Info -->
+    <div class="space-y-2">
+      <p><strong>Highest Bid:</strong> {{ highestBid }} ETH</p>
+      <p><strong>Highest Bidder:</strong> {{ highestBidder }}</p>
+      <p><strong>Time Left:</strong> {{ timeLeft }}s</p>
+    </div>
 
-            <li class="group cursor-pointer transition duration-300 rounded-md px-3 py-2 hover:bg-blue-50 flex items-center justify-between">
-              <span class="text-gray-700 group-hover:text-blue-800 transition">📢 Thông báo v/v nộp hồ sơ miễn giảm học phí...</span>
-              <span class="text-blue-600 opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition duration-300">→</span>
-            </li>
+    <!-- Place a Bid -->
+    <div class="space-y-4">
+      <input
+        v-model="bidAmount"
+        type="number"
+        placeholder="Enter bid in ETH"
+        class="border p-2 w-full rounded-md"
+      />
+      <button
+        @click="submitBid"
+        class="w-full bg-blue-600 text-white py-2 rounded-md hover:bg-blue-700"
+      >
+        Place Bid
+      </button>
+    </div>
 
-            <li class="group cursor-pointer transition duration-300 rounded-md px-3 py-2 hover:bg-blue-50 flex items-center justify-between">
-              <span class="text-gray-700 group-hover:text-blue-800 transition">📢 Thông báo về việc mua BHYT cho sinh viên...</span>
-              <span class="text-blue-600 opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition duration-300">→</span>
-            </li>
-          </ul>
-
-        </section>
-
-        <!-- Thông báo khác -->
-        <section class="bg-white rounded-lg shadow p-6">
-          <h2 class="text-lg font-semibold text-blue-900 mb-4 border-b pb-2">Thông báo</h2>
-          <ul class="space-y-3">
-            <li class="hover:text-blue-700 cursor-pointer">⚠️ Cảnh báo học tập học kỳ 2 năm học 2024-2025...</li>
-            <li class="hover:text-blue-700 cursor-pointer">⚠️ Buộc thôi học đối với sinh viên D19...</li>
-          </ul>
-        </section>
-      </div>
-
-      <!-- Right sidebar -->
-      <aside class="space-y-6">
-        <!-- Đăng nhập -->
-        <div class="bg-white rounded-lg shadow p-6">
-          <h2 class="text-lg font-semibold text-blue-900 mb-4">Đăng nhập</h2>
-          <form class="space-y-4">
-            <input type="text" placeholder="Mã sinh viên" class="w-full border rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
-            <input type="password" placeholder="Mật khẩu" class="w-full border rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
-            <div class="flex items-center space-x-2">
-              <input type="radio" name="type" class="text-blue-600" checked />
-              <label>Sinh viên đang học</label>
-            </div>
-            <div class="flex items-center space-x-2">
-              <input type="radio" name="type" class="text-blue-600" />
-              <label>Sinh viên tốt nghiệp</label>
-            </div>
-            <button type="submit" class="w-full bg-blue-600 text-white py-2 rounded-md hover:bg-blue-700 transition">Đăng nhập</button>
-          </form>
-        </div>
-
-        <!-- Phụ huynh -->
-        <div class="bg-white rounded-lg shadow p-6">
-          <h2 class="text-lg font-semibold text-blue-900 mb-4">Dành cho phụ huynh</h2>
-          <ul class="space-y-2 text-blue-600">
-            <li><a href="#">🔎 Tra cứu thông tin</a></li>
-            <li><a href="#">📄 Tra cứu văn bằng</a></li>
-            <li><a href="#">📊 Tra cứu kết quả học tập</a></li>
-          </ul>
-        </div>
-      </aside>
-    </main>
+    <!-- Bid History -->
+    <div class="mt-6">
+      <h2 class="text-lg font-semibold mb-2">📜 Bid History</h2>
+      <ul class="border rounded-md divide-y">
+        <li
+          v-for="(bid, index) in bidList"
+          :key="index"
+          class="p-2 text-sm flex justify-between"
+        >
+          <span>{{ bid.bidder }}</span>
+          <span>{{ bid.amount }} ETH</span>
+        </li>
+        <li v-if="bidList.length === 0" class="p-2 text-gray-500 text-center">
+          No bids yet
+        </li>
+      </ul>
+    </div>
   </div>
 </template>
+
+<script setup>
+import { ref, onMounted } from "vue";
+
+const API_BASE = "http://localhost:3001";
+
+const highestBid = ref("0");
+const highestBidder = ref("");
+const bidAmount = ref("");
+const bidList = ref([]);
+const timeLeft = ref(0);
+
+// Lấy thông tin đấu giá
+async function fetchAuctionInfo() {
+  try {
+    const res = await $fetch(`${API_BASE}/auction/info`);
+    console.log("Auction info:", res);
+  } catch (err) {
+    console.error("Fetch auction info error:", err);
+  }
+}
+
+// Lấy bid cao nhất
+async function fetchHighest() {
+  try {
+    const res = await $fetch(`${API_BASE}/auction/highest`);
+    highestBid.value = res.highest;
+    highestBidder.value = res.highestBidder;
+  } catch (err) {
+    console.error("Fetch highest bid error:", err);
+  }
+}
+
+// Lấy danh sách tất cả người tham gia
+async function fetchBidList() {
+  try {
+    const res = await $fetch(`${API_BASE}/auction/bids`);
+    bidList.value = res;
+  } catch (err) {
+    console.error("Fetch bid list error:", err);
+    bidList.value = [];
+  }
+}
+
+// Gửi bid mới
+async function submitBid() {
+  if (!bidAmount.value || parseFloat(bidAmount.value) <= 0) {
+    alert("Please enter a valid amount!");
+    return;
+  }
+  try {
+    const res = await $fetch(`${API_BASE}/auction/bid`, {
+      method: "POST",
+      body: { amountEth: parseFloat(bidAmount.value) },
+    });
+    if (res.success) {
+      alert(`Bid placed! TX hash: ${res.txHash}`);
+      bidAmount.value = "";
+      await fetchHighest();
+      await fetchBidList();
+    } else {
+      alert("Error: " + res.error);
+    }
+  } catch (err) {
+    console.error("Submit bid error:", err);
+  }
+}
+
+onMounted(async () => {
+  await fetchAuctionInfo();
+  await fetchHighest();
+  await fetchBidList();
+});
+</script>
+
+<style scoped>
+body {
+  font-family: "Inter", sans-serif;
+  background-color: #f8fafc;
+}
+</style>
