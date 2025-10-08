@@ -23,7 +23,6 @@ export class BlockchainController {
   @Get('list')
   async getAllActions() {
     const addresses = await this.blockchainService.getAllActions();
-    
     // 👇 Khai báo kiểu dữ liệu rõ ràng
     const results: {
       address: string;

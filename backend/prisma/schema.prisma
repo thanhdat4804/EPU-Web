@@ -8,15 +8,23 @@ datasource db {
 }
 
 model User {
-  id        Int       @id @default(autoincrement())
-  name      String
-  email     String    @unique
-  wallet    String?   @unique
-  role      String    @default("User") // User | Admin | Seller
-  items     Item[]
-  auctions  Auction[] @relation("SellerAuctions")
-  bids      Bid[]
-  createdAt DateTime  @default(now())
+  id                   Int       @id @default(autoincrement())
+  name                 String
+  email                String    @unique
+  password             String
+  wallet               String?   @unique
+  privatekey  String?   // 🔒 lưu private key đã mã hóa
+  role                 String    @default("User") // User | Admin | Seller
+  items                Item[]
+  auctions             Auction[] @relation("SellerAuctions")
+  bids                 Bid[]
+  createdAt            DateTime  @default(now())
+}
+
+model Category {
+  id       Int     @id @default(autoincrement())
+  name     String  @unique
+  items    Item[]  // 1 category có nhiều items
 }
 
 model Item {
@@ -43,6 +51,10 @@ model Item {
   auction        Auction?
 
   status         String    @default("pending") // pending | approved | rejected
+
+  // 🔹 Thể loại
+  category       Category? @relation(fields: [categoryId], references: [id])
+  categoryId     Int?
 
   reviewResult   ReviewResult?
 
