@@ -1,247 +1,97 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+generator client {
+  provider = "prisma-client-js"
+}
 
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
-generator client {
-  provider = "prisma-client-js"
-}
-
-//User
-
 model User {
-  id        Int      @id @default(autoincrement())
-  fullName  String
-  email     String   @unique
-  password  String
-  role      Role
-  createdAt DateTime @default(now())
-
-  // Quan hệ
-  classes          Class[]        @relation("TeacherClasses") // nếu user là teacher
-  messagesSent     Message[]      @relation("MessageSender")
-  messagesReceived Message[]      @relation("MessageReceiver")
-  submissions      Submission[]
-  grades           Grade[]
-  registrations    Registration[]
-  attendances      AttendInfo[]
-  payments         Payment[]
-  notices          Notice[]
-  reExams          ReExam[]
-  complaints       Complaint[]
+  id        Int       @id @default(autoincrement())
+  name      String
+  email     String    @unique
+  wallet    String?   @unique
+  role      String    @default("User") // User | Admin | Seller
+  items     Item[]
+  auctions  Auction[] @relation("SellerAuctions")
+  bids      Bid[]
+  createdAt DateTime  @default(now())
 }
 
-//Khóa học, tín chỉ
+model Item {
+  id             Int       @id @default(autoincrement())
+  name           String
+  description    String?
+  imageUrl       String?
 
-model Course {
-  id     Int    @id @default(autoincrement())
-  code   String @unique
-  name   String
-  credit Int
+  // 💰 Giá khởi điểm (bắt buộc)
+  startingPrice  Float
 
-  classes       Class[]
-  registrations Registration[]
+  // 🎯 Giá sàn (reserve price) - tùy chọn
+  reservePrice   Float?
+
+  // 💎 Giá ước tính (estimate) - tùy chọn
+  estimateMin    Float?
+  estimateMax    Float?
+
+  // 👤 Chủ sở hữu
+  owner          User      @relation(fields: [ownerId], references: [id])
+  ownerId        Int
+
+  // 🔗 Liên kết tới phiên đấu giá
+  auction        Auction?
+
+  status         String    @default("pending") // pending | approved | rejected
+
+  reviewResult   ReviewResult?
+
+  createdAt      DateTime  @default(now())
 }
 
-//Lớp học
-
-model Class {
-  id       Int     @id @default(autoincrement())
-  name     String
-  semester String?
-  year     Int?
-
-  courseId Int
-  course   Course @relation(fields: [courseId], references: [id])
-
-  teacherId Int?
-  teacher   User? @relation("TeacherClasses", fields: [teacherId], references: [id])
-
-  schedules   Schedule[]
-  submissions Submission[]
-  grades      Grade[]
-  reExams     ReExam[]
-
-  students Registration[] // Quan hệ tới Registration
-}
-
-//Lịch học
-
-model Schedule {
-  id        Int          @id @default(autoincrement())
-  date      DateTime
-  startTime DateTime
-  endTime   DateTime
-  type      ScheduleType
-
-  classId Int
-  class   Class @relation(fields: [classId], references: [id])
-
-  attendances AttendInfo[]
-}
-
-//Thông tin điểm danh
-
-model AttendInfo {
-  id     Int          @id @default(autoincrement())
-  status AttendStatus
-  note   String?
-
-  scheduleId Int
-  schedule   Schedule @relation(fields: [scheduleId], references: [id])
-
-  studentId Int
-  student   User @relation(fields: [studentId], references: [id])
-}
-
-//Bài nộp
-
-model Submission {
+model ReviewResult {
   id          Int      @id @default(autoincrement())
-  fileUrl     String
-  submittedAt DateTime @default(now())
-  grade       Float?
-
-  studentId Int
-  student   User @relation(fields: [studentId], references: [id])
-
-  classId Int
-  class   Class @relation(fields: [classId], references: [id])
+  item        Item     @relation(fields: [itemId], references: [id])
+  itemId      Int      @unique   // ✅ cần thêm @unique vì 1 Item chỉ có 1 ReviewResult
+  status      String   @default("pending") // "approved", "rejected", "waiting_admin"
+  confidence  Float?
+  reasons     String?
+  reviewedBy  String?  // 'AI' hoặc 'Admin'
+  createdAt   DateTime @default(now())
 }
 
-//Điểm số
-
-model Grade {
-  id     Int     @id @default(autoincrement())
-  score  Float
-  letter String?
-
-  studentId Int
-  student   User @relation(fields: [studentId], references: [id])
-
-  classId Int
-  class   Class @relation(fields: [classId], references: [id])
+model Auction {
+  id              Int       @id @default(autoincrement())
+  item            Item      @relation(fields: [itemId], references: [id])
+  itemId          Int       @unique  // ✅ mỗi item chỉ có 1 auction
+  seller          User      @relation("SellerAuctions", fields: [sellerId], references: [id])
+  sellerId        Int
+  contractAddress String    @unique
+  startTime       DateTime
+  endTime         DateTime
+  status          String    @default("Active") // Active | Ended | Cancelled
+  bids            Bid[]
+  transactions    Transaction[]
+  createdAt       DateTime  @default(now())
 }
 
-//Thông tin đăng ký tín chỉ
-
-model Registration {
-  id           Int      @id @default(autoincrement())
-  registeredAt DateTime @default(now())
-
-  studentId Int
-  student   User @relation(fields: [studentId], references: [id])
-
-  courseId Int
-  course   Course @relation(fields: [courseId], references: [id])
-
-  classId Int
-  class   Class @relation(fields: [classId], references: [id])
+model Bid {
+  id         Int       @id @default(autoincrement())
+  bidder     User      @relation(fields: [bidderId], references: [id])
+  bidderId   Int
+  auction    Auction   @relation(fields: [auctionId], references: [id])
+  auctionId  Int
+  amount     Float
+  createdAt  DateTime  @default(now())
 }
 
-//Thông tin thanh toán
-
-model Payment {
-  id        Int           @id @default(autoincrement())
-  amount    Float
-  status    PaymentStatus
-  createdAt DateTime      @default(now())
-
-  studentId Int
-  student   User @relation(fields: [studentId], references: [id])
-}
-
-//News, thông báo
-
-model Notice {
-  id        Int      @id @default(autoincrement())
-  title     String
-  content   String
-  createdAt DateTime @default(now())
-
-  createdBy Int
-  user      User @relation(fields: [createdBy], references: [id])
-}
-
-//Tin nhắn
-
-model Message {
-  id      Int      @id @default(autoincrement())
-  content String
-  sentAt  DateTime @default(now())
-
-  senderId Int
-  sender   User @relation("MessageSender", fields: [senderId], references: [id])
-
-  receiverId Int
-  receiver   User @relation("MessageReceiver", fields: [receiverId], references: [id])
-}
-
-//Phúc khảo
-
-model ReExam {
-  id        Int          @id @default(autoincrement())
-  reason    String
-  status    ReExamStatus @default(pending)
-  createdAt DateTime     @default(now())
-
-  studentId Int
-  student   User @relation(fields: [studentId], references: [id])
-
-  classId Int
-  class   Class @relation(fields: [classId], references: [id])
-}
-
-//Tố cáo
-
-model Complaint {
-  id        Int             @id @default(autoincrement())
-  title     String
-  content   String
-  status    ComplaintStatus @default(pending)
-  createdAt DateTime        @default(now())
-
-  studentId Int
-  student   User @relation(fields: [studentId], references: [id])
-}
-
-enum Role {
-  student
-  teacher
-  admin
-}
-
-enum ScheduleType {
-  lecture
-  exam
-}
-
-enum AttendStatus {
-  present
-  absent
-  late
-}
-
-enum PaymentStatus {
-  pending
-  paid
-  failed
-}
-
-enum ReExamStatus {
-  pending
-  approved
-  rejected
-}
-
-enum ComplaintStatus {
-  pending
-  resolved
-  rejected
+model Transaction {
+  id          Int       @id @default(autoincrement())
+  txHash      String
+  fromAddress String
+  toAddress   String
+  amount      Float
+  auction     Auction?  @relation(fields: [auctionId], references: [id])
+  auctionId   Int?
+  createdAt   DateTime  @default(now())
 }
