@@ -1,5 +1,5 @@
 <template>
-<div>Test1</div>
+<div>Test2</div>
   <div class="p-8">
     <h1 class="text-2xl font-bold mb-4">Tạo đấu giá mới</h1>
 
