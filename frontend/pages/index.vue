@@ -1,30 +1,40 @@
 <template>
-  <div class="container mx-auto p-6">
-    <h1 class="text-2xl font-semibold mb-4">All Auctions</h1>
+  <div>
+    <Navbar />
 
-    <div v-for="auction in auctions" :key="auction.address" class="border p-4 rounded-lg mb-4 shadow">
-      <p><strong>Seller:</strong> {{ auction.seller }}</p>
-      <p><strong>Highest Bid:</strong> {{ auction.highestBid }} ETH</p>
-      <p><strong>Ended:</strong> {{ auction.ended ? 'Yes' : 'No' }}</p>
+    <CategoryBar />
 
-      <NuxtLink
-        :to="`/auction/${auction.address}`"
-        class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 mt-2 inline-block"
-      >
-        View Details
-      </NuxtLink>
-    </div>
+    <section class="mt-10 text-center">
+      <h2 class="text-3xl font-semibold text-blue-700">
+        Special objects, <span class="text-black">selected by experts</span>
+      </h2>
+    </section>
+
+    <FeaturedSlider />
+
+    <section class="grid grid-cols-2 md:grid-cols-4 gap-6 mt-10 px-10">
+      <AuctionCard
+        v-for="item in featuredItems"
+        :key="item.id"
+        :item="item"
+      />
+    </section>
+
+    <Footer />
   </div>
 </template>
 
-<script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { useAuctionApi } from '~/composables/useAuctionApi'
+<script setup>
+import Navbar from '~/components/Navbar.vue'
+import CategoryBar from '~/components/CategoryBar.vue'
+import FeaturedSlider from '~/components/FeaturedSlider.vue'
+import AuctionCard from '~/components/AuctionCard.vue'
+import Footer from '~/components/Footer.vue'
 
-const { getAuctions } = useAuctionApi()
-const auctions = ref<any[]>([])
-
-onMounted(async () => {
-  auctions.value = await getAuctions()
-})
+const featuredItems = [
+  { id: 1, title: 'Vintage Lamp', image: '/img/lamp.jpg', bid: '€120' },
+  { id: 2, title: 'Rare Pokemon Card', image: '/img/card.jpg', bid: '€950' },
+  { id: 3, title: 'Classic Painting', image: '/img/art.jpg', bid: '€4000' },
+  { id: 4, title: 'Jaguar E-Type', image: '/img/car.jpg', bid: '€95,000' },
+]
 </script>
