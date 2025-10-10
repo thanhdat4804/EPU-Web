@@ -57,11 +57,12 @@ const handleLogin = async () => {
       body: { email: email.value, password: password.value }
     })
 
-    // 🟩 Giả định backend trả về {token: '...' }
-    if (res?.token) {
-      localStorage.setItem('token', res.token)
+    // 🟢 Backend NestJS thường trả về { access_token: '...' }
+    const token = res?.access_token || res?.token
+    if (token) {
+      localStorage.setItem('jwt', token) // ✅ dùng cùng key với chỗ gọi API
       alert('Đăng nhập thành công!')
-      router.push('/auction/index') // ✅ Redirect sau khi đăng nhập
+      router.push('/auction/index') // ✅ Redirect sang danh sách đấu giá
     } else {
       alert('Không nhận được token từ server')
     }

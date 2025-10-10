@@ -1,12 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { ethers } from 'ethers';
+import { PrismaService } from '../../prisma/prisma.service';
 
 @Injectable()
 export class BlockchainService {
   private provider: ethers.providers.JsonRpcProvider;
   private wallet: ethers.Wallet;
   private factory: ethers.Contract;
-  private factoryAddress = '0x5FbDB2315678afecb367f032d93F642f64180aa3'; // ✅ Factory address cố định
+  private factoryAddress = '0x5FbDB2315678afecb367f032d93F642f64180aa3';
 
   private factoryABI = [
     "function createAction(uint _biddingTime) public",
@@ -20,105 +21,120 @@ export class BlockchainService {
     "function highestBid() view returns (uint)",
     "function highestBidder() view returns (address)",
     "function seller() view returns (address)",
-    "function actionEndTime() view returns (uint)"
+    "function actionEndTime() view returns (uint)",
+    "function ended() view returns (bool)"
   ];
 
-  constructor() {
+  constructor(private readonly prisma: PrismaService) {
     this.provider = new ethers.providers.JsonRpcProvider('http://127.0.0.1:8545');
-
-    // Private key account đầu tiên của Hardhat
     this.wallet = new ethers.Wallet(
       '0x8b3a350cf5c34c9194ca85829a2df0ec3153be0318b5e2d3348e872092edffba',
       this.provider
     );
-
     this.factory = new ethers.Contract(this.factoryAddress, this.factoryABI, this.wallet);
   }
 
-  async createAuction(durationSeconds: number) {
-    const tx = await this.factory.createAction(durationSeconds);
+  // 🟢 Tạo đấu giá mới
+  async createAuction(data: any, userId: number) {
+    const tx = await this.factory.createAction(data.duration);
     const receipt = await tx.wait();
 
-    console.log('📜 All events:', receipt.events);
-
-    let newAuctionAddress = null;
-
-    if (receipt.events && receipt.events.length > 0) {
-      for (const ev of receipt.events) {
-        // ethers v5
-        if (ev.event === 'ActionCreated') {
-          newAuctionAddress = ev.args?.actionAddress || ev.args?.[1];
-          break;
-        }
-
-        // ethers v6 (khi event không có .event name)
-        if (ev.topics && ev.topics.length > 0 && ev.data) {
-          try {
-            const parsed = this.factory.interface.parseLog(ev);
-            if (parsed.name === 'ActionCreated') {
-              newAuctionAddress = parsed.args.actionAddress;
-              break;
-            }
-          } catch {}
-        }
+    let newAuctionAddress: string | null = null;
+    for (const ev of receipt.events || []) {
+      if (ev.event === 'ActionCreated') {
+        newAuctionAddress = ev.args?.actionAddress || ev.args?.[1];
+        break;
       }
     }
 
-    console.log('✅ New auction address:', newAuctionAddress);
+    if (!newAuctionAddress) throw new Error('Không tìm thấy địa chỉ đấu giá mới!');
 
-    if (!newAuctionAddress) {
-      throw new Error('Không tìm thấy địa chỉ đấu giá mới trong event!');
-    }
+    const item = await this.prisma.item.create({
+      data: {
+        name: data.name,
+        description: data.description,
+        imageUrl: data.imageUrl,
+        startingPrice: data.startingPrice,
+        reservePrice: data.reservePrice,
+        ownerId: userId,
+        status: 'pending',
+      },
+    });
 
-    return { address: newAuctionAddress, duration: durationSeconds };
+    const startTime = new Date();
+    const endTime = new Date(startTime.getTime() + data.duration * 1000);
+
+    const auction = await this.prisma.auction.create({
+      data: {
+        itemId: item.id,
+        sellerId: userId,
+        contractAddress: newAuctionAddress,
+        startTime,
+        endTime,
+        status: 'Active',
+      },
+      include: { item: true },
+    });
+
+    return auction;
   }
 
-  // 🟢 Lấy danh sách tất cả các cuộc đấu giá
-  async getAllActions() {
-    return this.factory.getAllActions();
+  // 🟢 Lấy danh sách tất cả đấu giá từ DB
+  async getAllAuctions() {
+    const auctions = await this.prisma.auction.findMany({
+      include: {
+        item: true,
+        seller: { select: { id: true, email: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    console.log('Auctions from DB:', auctions);
+    return auctions;
   }
 
-  // 🟢 Lấy thông tin chi tiết 1 cuộc đấu giá (theo contractAddress)
-  async getAuctionInfo(contractAddress: string) {
+  // 🟢 Chi tiết 1 phiên đấu giá
+  async getAuctionDetail(contractAddress: string) {
     const auction = new ethers.Contract(contractAddress, this.auctionABI, this.wallet);
 
-    const [highestBid, highestBidder, seller, endTime] = await Promise.all([
+    const [highestBid, highestBidder, seller, endTime, ended] = await Promise.all([
       auction.highestBid(),
       auction.highestBidder(),
       auction.seller(),
       auction.actionEndTime(),
+      auction.ended(),
     ]);
-    const endTimeNumber = endTime.toNumber ? endTime.toNumber() : Number(endTime);
-    const endTimeDate = new Date(endTimeNumber * 1000);
-    const remainingSeconds = Math.max(0, Math.floor((endTimeDate.getTime() - Date.now()) / 1000));
+
     return {
       contractAddress,
       seller,
-      endTime: endTimeDate.toLocaleString(), // -> ví dụ "10/7/2025, 1:20:00 PM"
-      remainingTime: remainingSeconds, // -> thêm thời gian còn lại
       highestBid: ethers.utils.formatEther(highestBid),
       highestBidder,
+      endTime: new Date(Number(endTime) * 1000).toLocaleString('vi-VN'),
+      ended,
     };
   }
 
-  // 🟢 Gửi giá thầu
   async placeBid(contractAddress: string, amountEth: number) {
     const auction = new ethers.Contract(contractAddress, this.auctionABI, this.wallet);
-    const tx = await auction.bid({
-      value: ethers.utils.parseEther(amountEth.toString()),
-    });
+    const tx = await auction.bid({ value: ethers.utils.parseEther(amountEth.toString()) });
     await tx.wait();
     return tx.hash;
   }
 
-  // 🟢 Lấy danh sách người tham gia & giá đấu
+  // 🟢 Lấy danh sách tất cả các bid từ contract
   async getAllBids(contractAddress: string) {
     const auction = new ethers.Contract(contractAddress, this.auctionABI, this.wallet);
     const [addresses, amounts] = await auction.getAllBids();
 
-    return addresses.map((addr: string, i: number) => ({
-      address: addr,
-      amount: ethers.utils.formatEther(amounts[i]),
+    // Chuyển BigNumber thành ETH rồi sắp xếp giảm dần
+    const result = addresses.map((addr: string, i: number) => ({
+      bidder: addr,
+      amount: parseFloat(ethers.utils.formatEther(amounts[i])),
     }));
+
+    // 🔽 Sắp xếp giảm dần theo số tiền
+    result.sort((a, b) => b.amount - a.amount);
+
+    return result;
   }
 }

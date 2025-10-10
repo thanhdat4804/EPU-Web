@@ -1,40 +1,54 @@
 <template>
-  <div>
-    <Navbar />
+  <div class="p-8 bg-gray-50 min-h-screen">
+    <h1 class="text-3xl font-bold mb-8 text-center text-gray-800">📦 Danh sách các phiên đấu giá</h1>
 
-    <CategoryBar />
+    <div v-if="auctions.length > 0" class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div
+        v-for="auction in auctions"
+        :key="auction.id"
+        class="bg-white shadow-md p-5 rounded-2xl border border-gray-200 hover:shadow-lg transition"
+      >
+        <img
+          v-if="auction.item?.imageUrl"
+          :src="auction.item.imageUrl"
+          class="w-full h-40 object-cover rounded-xl mb-3"
+        />
+        <h2 class="text-xl font-semibold mb-1">{{ auction.item?.name }}</h2>
+        <p class="text-gray-600 mb-2 line-clamp-2">{{ auction.item?.description }}</p>
 
-    <section class="mt-10 text-center">
-      <h2 class="text-3xl font-semibold text-blue-700">
-        Special objects, <span class="text-black">selected by experts</span>
-      </h2>
-    </section>
+        <p><b>Giá khởi điểm:</b> {{ auction.item?.startingPrice }} ETH</p>
+        <p><b>Trạng thái:</b> {{ auction.status }}</p>
+        <p><b>Kết thúc:</b> {{ formatDate(auction.endTime) }}</p>
 
-    <FeaturedSlider />
+        <NuxtLink :to="`/auction/${auction.contractAddress}`" class="text-blue-600 hover:underline">
+          Xem chi tiết
+        </NuxtLink>
+      </div>
+    </div>
 
-    <section class="grid grid-cols-2 md:grid-cols-4 gap-6 mt-10 px-10">
-      <AuctionCard
-        v-for="item in featuredItems"
-        :key="item.id"
-        :item="item"
-      />
-    </section>
-
-    <Footer />
+    <div v-else class="text-center text-gray-500 mt-20 text-lg">
+      Không có phiên đấu giá nào.
+    </div>
   </div>
 </template>
 
 <script setup>
-import Navbar from '~/components/Navbar.vue'
-import CategoryBar from '~/components/CategoryBar.vue'
-import FeaturedSlider from '~/components/FeaturedSlider.vue'
-import AuctionCard from '~/components/AuctionCard.vue'
-import Footer from '~/components/Footer.vue'
+import { ref, onMounted } from 'vue'
+import { useAuctionApi } from '~/composables/useAuctionApi'
 
-const featuredItems = [
-  { id: 1, title: 'Vintage Lamp', image: '/img/lamp.jpg', bid: '€120' },
-  { id: 2, title: 'Rare Pokemon Card', image: '/img/card.jpg', bid: '€950' },
-  { id: 3, title: 'Classic Painting', image: '/img/art.jpg', bid: '€4000' },
-  { id: 4, title: 'Jaguar E-Type', image: '/img/car.jpg', bid: '€95,000' },
-]
+const auctions = ref([])
+const { getAuctions } = useAuctionApi()
+
+onMounted(async () => {
+  try {
+    auctions.value = await getAuctions()
+    
+  } catch (err) {
+    console.error('❌ Lỗi tải danh sách:', err)
+  }
+})
+
+const formatDate = (dateStr) => {
+  return new Date(dateStr).toLocaleString('vi-VN')
+}
 </script>

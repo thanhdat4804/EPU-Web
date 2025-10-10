@@ -7,27 +7,32 @@ export function useAuctionApi() {
     return await $fetch(`${API_BASE}/list`)
   }
 
-  const getAuctionInfo = async (address: string): Promise<any> => {
-    return await $fetch(`${API_BASE}/info`, { query: { address } })
+  const getAuctionDetail = async (address: string): Promise<any> => {
+  return await $fetch(`${API_BASE}/${address}`)
   }
 
-  const createAuction = async (duration: number): Promise<any> => {
+
+  const getAllBids = async (address: string): Promise<any[]> => {
+    return await $fetch(`${API_BASE}/${address}/bids`)
+  }
+
+  const createAuction = async (auctionData: any): Promise<any> => {
+    const token = localStorage.getItem('jwt')
     return await $fetch(`${API_BASE}/create`, {
       method: 'POST',
-      body: { duration },
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      body: auctionData,
     })
   }
 
   const placeBid = async (address: string, amount: number): Promise<any> => {
-    return await $fetch(`${API_BASE}/bid`, {
+    return await $fetch(`${API_BASE}/${address}/bid`, {
       method: 'POST',
-      body: { address, amount },
+      body: { amount },
     })
   }
 
-  const getAllBids = async (address: string): Promise<any[]> => {
-    return await $fetch(`${API_BASE}/bids`, { query: { address } })
-  }
-
-  return { getAuctions, getAuctionInfo, createAuction, placeBid, getAllBids }
+  return { getAuctions, getAuctionDetail, getAllBids, createAuction, placeBid }
 }

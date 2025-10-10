@@ -1,61 +1,38 @@
-import { Controller, Get, Post, Body, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, Query, Req, UseGuards, Param } from '@nestjs/common';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { BlockchainService } from './blockchain.service';
 
 @Controller('auction')
 export class BlockchainController {
   constructor(private readonly blockchainService: BlockchainService) {}
 
+  @UseGuards(JwtAuthGuard)
   @Post('create')
-  async createAuction(@Body() body: { duration: number }) {
-    // Gọi blockchain để tạo cuộc đấu giá mới
-    const result = await this.blockchainService.createAuction(body.duration);
-
-    // Lấy lại thông tin chi tiết ngay sau khi tạo
-    const info = await this.blockchainService.getAuctionInfo(result.address);
-
-    return {
-      message: 'Đấu giá tạo thành công!',
-      address: result.address,
-      info,
-    };
+  async createAuction(@Body() body: any, @Req() req) {
+    const userId = req.user.userId;
+    return this.blockchainService.createAuction(body, userId);
   }
 
   @Get('list')
-  async getAllActions() {
-    const addresses = await this.blockchainService.getAllActions();
-    // 👇 Khai báo kiểu dữ liệu rõ ràng
-    const results: {
-      address: string;
-      highestBid: string;
-      highestBidder: string;
-      seller: string;
-      endTime: string;
-    }[] = [];
-
-    for (const addr of addresses) {
-      const info = await this.blockchainService.getAuctionInfo(addr);
-      results.push({
-        address: addr,
-        ...info,
-      });
-    }
-
-    return results;
+  async getAllAuctions() {
+    return this.blockchainService.getAllAuctions();
   }
 
-
-  @Get('info')
-  getAuctionInfo(@Query('address') address: string) {
-    return this.blockchainService.getAuctionInfo(address);
+  @Post(':contractAddress/bid')
+  async placeBid(
+    @Param('contractAddress') contractAddress: string,
+    @Body('amount') amount: number,
+  ) {
+    return this.blockchainService.placeBid(contractAddress, amount);
   }
 
-  @Post('bid')
-  placeBid(@Body() body: { address: string; amount: number }) {
-    return this.blockchainService.placeBid(body.address, body.amount);
-  }
-
-  @Get('bids')
-  getAllBids(@Query('address') address: string) {
+  @Get(':address/bids')
+  async getAllBids(@Param('address') address: string) {
     return this.blockchainService.getAllBids(address);
+  }
+
+  @Get(':address')
+  async getAuctionDetail(@Param('address') address: string) {
+    return this.blockchainService.getAuctionDetail(address);
   }
 }
