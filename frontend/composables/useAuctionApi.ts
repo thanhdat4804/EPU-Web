@@ -28,11 +28,17 @@ export function useAuctionApi() {
   }
 
   const placeBid = async (address: string, amount: number): Promise<any> => {
-    return await $fetch(`${API_BASE}/${address}/bid`, {
-      method: 'POST',
-      body: { amount },
-    })
-  }
+  const token = localStorage.getItem('jwt')
+  if (!token) throw new Error('User not logged in')
+
+  return await $fetch(`${API_BASE}/${address}/bid`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: { amount },
+  })
+}
 
   return { getAuctions, getAuctionDetail, getAllBids, createAuction, placeBid }
 }

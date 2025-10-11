@@ -15,9 +15,9 @@
         />
 
         <p class="text-gray-700 mb-2">{{ auction.item?.description }}</p>
-        <p><b>👤 Người bán:</b> {{ auction.seller }}</p>
-        <p><b>🏆 Giá cao nhất hiện tại:</b> {{ auction.highestBid }} ETH</p>
-        <p><b>💰 Người giữ giá cao nhất:</b> {{ auction.highestBidder }}</p>
+        <p><b>👤 Người bán:</b> {{ auction.seller?.email || auction.seller }}</p>
+        <p><b>🏆 Giá cao nhất hiện tại:</b> {{ auction.highestBid || auction.item?.startingPrice }} ETH</p>
+        <p><b>💰 Người giữ giá cao nhất:</b> {{ auction.highestBidder || '-' }}</p>
       </div>
 
       <!-- Countdown -->
@@ -68,7 +68,7 @@
             :key="i"
             class="flex justify-between items-center border-b py-2"
           >
-            <span>{{ b.bidder }}</span>
+            <span>{{ b.fromAddress }}</span>
             <span class="font-semibold text-gray-800">{{ b.amount }} ETH</span>
           </li>
         </ul>
@@ -82,21 +82,21 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAuctionApi } from '~/composables/useAuctionApi'
 
 const route = useRoute()
-const auction = ref(null)
-const bidders = ref([])
+const auction = ref<any>(null)
+const bidders = ref<any[]>([])
 const bidAmount = ref(0)
 const { getAuctionDetail, getAllBids, placeBid } = useAuctionApi()
 
 // Countdown
 const countdown = ref({ DAYS: '00', HOURS: '00', MINUTES: '00', SECONDS: '00' })
 const progress = ref(0)
-let timer = null
+let timer: any = null
 
 const updateCountdown = () => {
   if (!auction.value?.endTime) return
@@ -123,7 +123,7 @@ const updateCountdown = () => {
 
 onMounted(async () => {
   try {
-    const address = route.params.address
+    const address = route.params.address as string
     auction.value = await getAuctionDetail(address)
     bidders.value = await getAllBids(address)
     updateCountdown()
@@ -137,20 +137,26 @@ onUnmounted(() => {
   if (timer) clearInterval(timer)
 })
 
+// Chỉnh lại placeBidAction để lưu transaction vào DB
 const placeBidAction = async () => {
   try {
-    const address = route.params.address
-    await placeBid(address, bidAmount.value)
-    bidders.value = await getAllBids(address)
+    const address = route.params.address as string
+    const tx = await placeBid(address, bidAmount.value) // Backend đã xử lý blockchain + DB
+    console.log('Transaction hash:', tx.txHash)
+    
+    // Cập nhật auction state và bidders list
     auction.value = await getAuctionDetail(address)
+    bidders.value = await getAllBids(address)
+
+    bidAmount.value = 0
     alert('Đặt giá thành công!')
-  } catch (err) {
+  } catch (err: any) {
     console.error(err)
-    alert('Đặt giá thất bại!')
+    alert(err?.message || 'Đặt giá thất bại!')
   }
 }
 
-const formatDate = (dateStr) => {
+const formatDate = (dateStr: string) => {
   return new Date(dateStr).toLocaleString('vi-VN')
 }
 </script>

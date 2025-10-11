@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common'
 import { ethers } from 'ethers';
 import { PrismaService } from '../../prisma/prisma.service';
 
@@ -114,11 +114,29 @@ export class BlockchainService {
     };
   }
 
-  async placeBid(contractAddress: string, amountEth: number) {
-    const auction = new ethers.Contract(contractAddress, this.auctionABI, this.wallet);
-    const tx = await auction.bid({ value: ethers.utils.parseEther(amountEth.toString()) });
-    await tx.wait();
-    return tx.hash;
+  async placeBid(contractAddress: string, amount: number, userId: number) {
+    // 1. Lấy wallet của bidder
+    const bidder = await this.prisma.user.findUnique({ where: { id: userId } })
+    if (!bidder || !bidder.wallet)
+      throw new NotFoundException('Wallet address not found for bidder')
+
+    // 2. Tạo contract instance và gửi transaction blockchain
+    const auctionContract = new ethers.Contract(contractAddress, this.auctionABI, this.wallet)
+    const tx = await auctionContract.bid({ value: ethers.utils.parseEther(amount.toString()) })
+    await tx.wait()
+
+    // 3. Lưu transaction vào DB
+    const transaction = await this.prisma.transaction.create({
+      data: {
+        txHash: tx.hash,
+        fromAddress: bidder.wallet,
+        toAddress: contractAddress,
+        amount,
+        auction: { connect: { contractAddress } }, // kết nối với Auction theo contractAddress
+      },
+    })
+
+    return transaction
   }
 
   // 🟢 Lấy danh sách tất cả các bid từ contract
@@ -137,4 +155,6 @@ export class BlockchainService {
 
     return result;
   }
+
+  
 }

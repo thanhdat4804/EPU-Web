@@ -99,7 +99,7 @@ model Bid {
 
 model Transaction {
   id          Int       @id @default(autoincrement())
-  txHash      String
+  txHash      String    @unique
   fromAddress String
   toAddress   String
   amount      Float

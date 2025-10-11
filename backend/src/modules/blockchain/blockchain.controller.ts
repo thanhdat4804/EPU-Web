@@ -18,12 +18,15 @@ export class BlockchainController {
     return this.blockchainService.getAllAuctions();
   }
 
+  @UseGuards(JwtAuthGuard)
   @Post(':contractAddress/bid')
   async placeBid(
     @Param('contractAddress') contractAddress: string,
     @Body('amount') amount: number,
+    @Req() req: any, // req.user sẽ có sub = userId
   ) {
-    return this.blockchainService.placeBid(contractAddress, amount);
+    const userId = req.user.userId // lấy userId từ JWT
+    return this.blockchainService.placeBid(contractAddress, amount, userId)
   }
 
   @Get(':address/bids')
