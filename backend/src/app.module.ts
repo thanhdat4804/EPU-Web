@@ -4,7 +4,8 @@ import { BlockchainModule } from './modules/blockchain/blockchain.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { WalletModule } from './modules/wallet/wallet.module';
 import { TransactionModule } from './modules/transaction/transaction.module';
+import { UserModule } from './modules/user/user.module';
 @Module({
-  imports: [PrismaModule, BlockchainModule, AuthModule, WalletModule, TransactionModule],
+  imports: [PrismaModule, BlockchainModule, AuthModule, WalletModule, TransactionModule, UserModule],
 })
 export class AppModule {}
