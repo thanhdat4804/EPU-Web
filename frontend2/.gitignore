@@ -4,9 +4,9 @@
 .nitro
 .cache/
 .data/
-manifest/
+manifest
 dist/
-
+.postcss.mjs
 # Nuxt frontend generated files
 frontend2/.nuxt/
 frontend2/.output/
