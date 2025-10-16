@@ -15,7 +15,7 @@ frontend2/.data/
 frontend2/dist/
 
 # Node dependencies
-node_modules
+node_modules/
 
 # Logs
 logs
