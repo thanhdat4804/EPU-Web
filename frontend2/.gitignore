@@ -1,11 +1,5 @@
 # Nuxt build & cache outputs
-.nuxt/
-.nuxt/.output/
-.nuxt/.nitro/
-.nuxt/.cache/
-.nuxt/.data/
-.nuxt/dist/
-
+.nuxt
 # Nuxt frontend generated files
 frontend2/.nuxt/
 frontend2/.output/
