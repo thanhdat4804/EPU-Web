@@ -1,9 +1,18 @@
-# Nuxt dev/build outputs
-.output
-.data
-.nitro
-.cache
-dist
+# Nuxt build & cache outputs
+.nuxt/
+.output/
+.nitro/
+.cache/
+.data/
+dist/
+
+# Nuxt frontend generated files
+frontend/.nuxt/
+frontend/.output/
+frontend/.nitro/
+frontend/.cache/
+frontend/.data/
+frontend/dist/
 
 # Node dependencies
 node_modules
