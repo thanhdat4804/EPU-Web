@@ -1,0 +1,171 @@
+[33mbfb35f6[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/backend[m[33m, [m[1;31morigin/HEAD[m[33m, [m[1;32mbackend[m[33m)[m chore: ignore node_modules folder properly
+[33m8c93f98[m Merge branch 'admin2'
+[33mb9d7808[m Update _metadata.json
+[33m5643991[m[33m ([m[1;31morigin/admin2[m[33m, [m[1;32madmin2[m[33m)[m a
+[33meda6304[m Merge branch 'main' into admin2
+[33mb451117[m 🧹 Ignore Nuxt auto-generated files (.nuxt, .nitro, postcss.mjs, etc)
+[33m36deeec[m a
+[33m79a091f[m a
+[33m00d70e3[m a
+[33mc295de2[m 🧹 Ignore Nuxt auto-generated files (.nuxt, .nitro, postcss.mjs, etc)
+[33m98b7119[m a
+[33m133d88f[m a
+[33mbb153ad[m a
+[33md467ae1[m 🧹 Ignore Nuxt auto-generated files (.nuxt, .nitro, postcss.mjs, etc)
+[33mf81c0c9[m a
+[33m0696af2[m Merge branch 'main' of https://github.com/thanhdat4804/EPU-Web
+[33mfc066b3[m a
+[33mc8a5548[m Update abc.vue
+[33mbc0cfb1[m Update abc.vue
+[33me202313[m Merge branch 'main' into admin2
+[33mdbc869c[m a
+[33md077cb1[m a
+[33mcc8d224[m Update abc.vue
+[33m8538482[m a
+[33mf19d9cd[m a
+[33m3734259[m a
+[33mc7ea234[m 3
+[33m962c941[m 3
+[33mc96abd0[m a
+[33m488e6c5[m a
+[33m73d6b7e[m a
+[33mfa79c35[m a
+[33m1bfe915[m a
+[33me8fbb2d[m a
+[33mfbc0325[m a
+[33m0e89389[m a
+[33maadd8b8[m a
+[33m477060e[m a
+[33md8ba600[m a
+[33m54d4755[m a
+[33md41058a[m a
+[33m6119a34[m Merge branch 'main' into admin2
+[33md7f0df4[m chore: ignore Nuxt build outputs (.nuxt, manifest, nitro, tailwind)
+[33m5d08582[m a
+[33m6404e48[m Merge branch 'frontend'
+[33m7e81cb2[m d
+[33mbc6eeb8[m ddd
+[33m1e96fdc[m ddfff
+[33mc70a919[m dđa
+[33m58d246b[m fv
+[33m991711f[m Merge branch 'main' into admin2
+[33mff2d534[m Merge branch 'main' into frontend
+[33m2898467[m chore: ignore Nuxt build outputs (.nuxt, manifest, nitro, tailwind)
+[33m8edfea3[m aksldk
+[33mab52634[m change
+[33m4102332[m a
+[33m830874c[m al
+[33m4af2a2e[m Update .gitignore
+[33m55de96a[m a
+[33mb07eb90[m ald
+[33mc3d1a82[m Merge branch 'backend'
+[33mb1813d3[m a
+[33mbc29f21[m a
+[33mac36b48[m ok
+[33mf2d7285[m oke
+[33m7a70e90[m ao
+[33ma138a96[m a
+[33m390e0fe[m Merge branch 'backend'
+[33m8145e2d[m ok
+[33m54fdc35[m Merge branch 'backend'
+[33m4d1a077[m ok
+[33m6c4ade6[m ok
+[33m8b8ba18[m ok
+[33mdb887c7[m ok
+[33m40a6c24[m ok
+[33ma8e7028[m ok
+[33m01df067[m ok
+[33md7371ef[m Update postcss.mjs
+[33madd287f[m Update .gitignore
+[33mc1eeed7[m ok
+[33m01f97ba[m ok
+[33m80b2fcc[m abc
+[33m8b38c81[m alo
+[33mee740d1[m ad
+[33m8b0fb1b[m ad
+[33m2d5e933[m Update .gitignore
+[33m077d3c7[m ac
+[33mc99b633[m Merge branch 'main' into frontend
+[33m79b9412[m Update abc.vue
+[33m3bf2007[m Update .gitignore
+[33m6d1ffa5[m Merge branch 'main' into frontend
+[33mbce9f08[m add
+[33m8b159eb[m abc
+[33ma5b0655[m Update .gitignore
+[33mcb2d765[m agf
+[33m16c906a[m ac
+[33m48fdb34[m update abc
+[33m234bc52[m ok
+[33mcf8c7b1[m ok
+[33m9788e60[m alo1
+[33mf17a7d1[m alo
+[33m95d3b9e[m f
+[33md7e92b0[m f
+[33m42526a8[m test
+[33md9e5a7b[m Merge branch 'frontend'
+[33m1d5df62[m Update postcss.mjs
+[33m5d3d48e[m v
+[33m63a977e[m v
+[33m559b35f[m d
+[33m038484b[m add gitignore postcss
+[33m86ee276[m tes3
+[33m0448a4f[m Merge branch 'backend'
+[33m74cb24d[m Update postcss.mjs
+[33m9791afa[m add .nuxt into gitignore
+[33m7afb901[m abc
+[33med6a4fb[m abc
+[33m6288e3b[m Merge branch 'main' into frontend
+[33mb70c938[m demo1
+[33mb01efd2[m gitignore delete .nuxt
+[33mee7e598[m delete admin folder
+[33m6899a90[m Merge branch 'main' into Admin
+[33mc85fc5e[m giao dien admin
+[33m0df3e99[m add User API: getAllUser, UserDetail, DeleteUser
+[33m42ef7f9[m update blockchain to add into database
+[33m7182678[m fix blockchain service, controller and auction view
+[33mde06757[m create login register view and call api
+[33m3007033[m Create test1.txt
+[33m94af0cd[m delete
+[33mebade2d[m Merge branch 'main' into test1
+[33m247dbdf[m Create test.txt
+[33mffcee47[m change name
+[33mf50a783[m Create test.txt
+[33mc2f7772[m delete 3 file
+[33me333070[m Merge branch 'main' into test1
+[33m7de715a[m Create test1.txt
+[33m1265dec[m Create test.txt
+[33m1edff1f[m Create main.txt
+[33m22e1c05[m Delete test.txt
+[33mf009fcb[m Update test.txt
+[33m79fc7dd[m Create test.txt
+[33m4fb4d26[m Delete test.txt
+[33m3debf51[m Create test.txt
+[33m44c1df8[m delete test
+[33m12e6d25[m Merge branch 'main' into test1
+[33m48a7e56[m Create test1.txt
+[33m3f7dfce[m Create test.txt
+[33ma99b5ee[m Delete test.txt
+[33ma44c514[m Merge branch 'test'
+[33m3d7fe7f[m Update test.txt
+[33m1863573[m Merge branch 'test'
+[33m9c199a2[m Create test.txt
+[33mf1586ea[m Merge branch 'main' into test1
+[33mcfdaa17[m Update abc.vue
+[33m0aecdcf[m Update create.vue
+[33m61ccf53[m Update abc.vue
+[33m62c8eaf[m Update create.vue
+[33me1db795[m Merge branch 'test'
+[33mda59c87[m Update abc.vue
+[33m652d5a2[m Merge pull request #1 from thanhdat4804/test
+[33m56abfe1[m Update Navbar.vue
+[33m22480e6[m test
+[33ma19e067[m fix db
+[33mac6d96a[m fix db
+[33mfc72148[m add blockchain
+[33me0354c9[m add new database
+[33m61fcf05[m add env
+[33m6ea4947[m add frontend
+[33m540bea5[m add backend
+[33m68df208[m de
+[33m16bfce4[m add backend
+[33m6e77afc[m Initial commit
