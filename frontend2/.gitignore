@@ -1,5 +1,5 @@
 # Nuxt build & cache outputs
-
+.nuxt/
 .output/
 .nitro/
 .cache/
