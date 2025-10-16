@@ -1,6 +1,18 @@
 # Nuxt build & cache outputs
+.nuxt/
+.output/
+.nitro/
+.cache/
+.data/
+dist/
 
 # Nuxt frontend generated files
+frontend2/.nuxt/
+frontend2/.output/
+frontend2/.nitro/
+frontend2/.cache/
+frontend2/.data/
+frontend2/dist/
 
 # Node dependencies
 node_modules
@@ -18,3 +30,6 @@ logs
 .env
 .env.*
 !.env.example
+
+# Ignore generated tailwind files
+frontend2/.nuxt/tailwind/postcss.mjs
