@@ -14,9 +14,13 @@ type HydrationStrategies = {
 type LazyComponent<T> = DefineComponent<HydrationStrategies, {}, {}, {}, {}, {}, {}, { hydrated: () => void }> & T
 
 interface _GlobalComponents {
-  'AuctionCard': typeof import("../../components/AuctionCard.vue")['default']
-  'CategoryBar': typeof import("../../components/CategoryBar.vue")['default']
-  'Navbar': typeof import("../../components/Navbar.vue")['default']
+  'UserCategoriesModal': typeof import("../../components/User/CategoriesModal.vue")['default']
+  'UserCategoriesPanel': typeof import("../../components/User/CategoriesPanel.vue")['default']
+  'UserCategoryBar': typeof import("../../components/User/CategoryBar.vue")['default']
+  'UserHeroBanner': typeof import("../../components/User/HeroBanner.vue")['default']
+  'UserNavbar': typeof import("../../components/User/Navbar.vue")['default']
+  'UserProductGrid': typeof import("../../components/User/ProductGrid.vue")['default']
+  'UserSubNavbar': typeof import("../../components/User/SubNavbar.vue")['default']
   'Footer': typeof import("../../components/footer.vue")['default']
   'Header': typeof import("../../components/header.vue")['default']
   'NuxtWelcome': typeof import("../../node_modules/nuxt/dist/app/components/welcome.vue")['default']
@@ -42,9 +46,13 @@ interface _GlobalComponents {
   'Html': typeof import("../../node_modules/nuxt/dist/head/runtime/components")['Html']
   'Body': typeof import("../../node_modules/nuxt/dist/head/runtime/components")['Body']
   'NuxtIsland': typeof import("../../node_modules/nuxt/dist/app/components/nuxt-island")['default']
-  'LazyAuctionCard': LazyComponent<typeof import("../../components/AuctionCard.vue")['default']>
-  'LazyCategoryBar': LazyComponent<typeof import("../../components/CategoryBar.vue")['default']>
-  'LazyNavbar': LazyComponent<typeof import("../../components/Navbar.vue")['default']>
+  'LazyUserCategoriesModal': LazyComponent<typeof import("../../components/User/CategoriesModal.vue")['default']>
+  'LazyUserCategoriesPanel': LazyComponent<typeof import("../../components/User/CategoriesPanel.vue")['default']>
+  'LazyUserCategoryBar': LazyComponent<typeof import("../../components/User/CategoryBar.vue")['default']>
+  'LazyUserHeroBanner': LazyComponent<typeof import("../../components/User/HeroBanner.vue")['default']>
+  'LazyUserNavbar': LazyComponent<typeof import("../../components/User/Navbar.vue")['default']>
+  'LazyUserProductGrid': LazyComponent<typeof import("../../components/User/ProductGrid.vue")['default']>
+  'LazyUserSubNavbar': LazyComponent<typeof import("../../components/User/SubNavbar.vue")['default']>
   'LazyFooter': LazyComponent<typeof import("../../components/footer.vue")['default']>
   'LazyHeader': LazyComponent<typeof import("../../components/header.vue")['default']>
   'LazyNuxtWelcome': LazyComponent<typeof import("../../node_modules/nuxt/dist/app/components/welcome.vue")['default']>
