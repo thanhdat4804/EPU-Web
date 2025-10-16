@@ -7,12 +7,12 @@
 dist/
 
 # Nuxt frontend generated files
-frontend/.nuxt/
-frontend/.output/
-frontend/.nitro/
-frontend/.cache/
-frontend/.data/
-frontend/dist/
+frontend2/.nuxt/
+frontend2/.output/
+frontend2/.nitro/
+frontend2/.cache/
+frontend2/.data/
+frontend2/dist/
 
 # Node dependencies
 node_modules
@@ -32,4 +32,4 @@ logs
 !.env.example
 
 # Ignore generated tailwind files
-frontend/.nuxt/tailwind/postcss.mjs
+frontend2/.nuxt/tailwind/postcss.mjs
