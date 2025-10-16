@@ -5,6 +5,7 @@
 .cache
 dist
 .nuxt
+frontend/.nuxt
 # Node dependencies
 node_modules
 
