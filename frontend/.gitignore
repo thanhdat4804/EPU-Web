@@ -1,37 +1,25 @@
-# Nuxt build & cache directories
-.nuxt/
+# Nuxt dev/build outputs
 .output/
+.data/
 .nitro/
 .cache/
-.data/
 dist/
-
-# Nuxt generated subfolders (frontend)
-frontend/.nuxt/
-frontend/.output/
-frontend/.nitro/
-frontend/.cache/
-frontend/.data/
-frontend/dist/
-
-# Nuxt auto-generated files to ignore
-frontend/.nuxt/manifest/
-frontend/.nuxt/nitro.json
-frontend/.nuxt/tailwind/postcss.mjs
-
 # Node dependencies
-node_modules/
+node_modules
 
 # Logs
-logs/
+logs
 *.log
 
-# IDE files
+# Misc
 .DS_Store
-.fleet/
-.idea/
+.fleet
+.idea
 
-# Local environment files
+# Local env files
 .env
 .env.*
 !.env.example
+
+# Ignore generated tailwind files
+frontend/.nuxt/tailwind/postcss.mjs
