@@ -14,6 +14,15 @@ type HydrationStrategies = {
 type LazyComponent<T> = DefineComponent<HydrationStrategies, {}, {}, {}, {}, {}, {}, { hydrated: () => void }> & T
 
 interface _GlobalComponents {
+  'UserCategoriesModal': typeof import("../../components/User/CategoriesModal.vue")['default']
+  'UserCategoriesPanel': typeof import("../../components/User/CategoriesPanel.vue")['default']
+  'UserCategoryBar': typeof import("../../components/User/CategoryBar.vue")['default']
+  'UserHeroBanner': typeof import("../../components/User/HeroBanner.vue")['default']
+  'UserNavbar': typeof import("../../components/User/Navbar.vue")['default']
+  'UserProductGrid': typeof import("../../components/User/ProductGrid.vue")['default']
+  'UserSubNavbar': typeof import("../../components/User/SubNavbar.vue")['default']
+  'Footer': typeof import("../../components/footer.vue")['default']
+  'Header': typeof import("../../components/header.vue")['default']
   'NuxtWelcome': typeof import("../../node_modules/nuxt/dist/app/components/welcome.vue")['default']
   'NuxtLayout': typeof import("../../node_modules/nuxt/dist/app/components/nuxt-layout")['default']
   'NuxtErrorBoundary': typeof import("../../node_modules/nuxt/dist/app/components/nuxt-error-boundary.vue")['default']
@@ -26,7 +35,7 @@ interface _GlobalComponents {
   'NuxtRouteAnnouncer': typeof import("../../node_modules/nuxt/dist/app/components/nuxt-route-announcer")['default']
   'NuxtImg': typeof import("../../node_modules/nuxt/dist/app/components/nuxt-stubs")['NuxtImg']
   'NuxtPicture': typeof import("../../node_modules/nuxt/dist/app/components/nuxt-stubs")['NuxtPicture']
-  'NuxtPage': typeof import("../../node_modules/nuxt/dist/pages/runtime/page-placeholder")['default']
+  'NuxtPage': typeof import("../../node_modules/nuxt/dist/pages/runtime/page")['default']
   'NoScript': typeof import("../../node_modules/nuxt/dist/head/runtime/components")['NoScript']
   'Link': typeof import("../../node_modules/nuxt/dist/head/runtime/components")['Link']
   'Base': typeof import("../../node_modules/nuxt/dist/head/runtime/components")['Base']
@@ -37,6 +46,15 @@ interface _GlobalComponents {
   'Html': typeof import("../../node_modules/nuxt/dist/head/runtime/components")['Html']
   'Body': typeof import("../../node_modules/nuxt/dist/head/runtime/components")['Body']
   'NuxtIsland': typeof import("../../node_modules/nuxt/dist/app/components/nuxt-island")['default']
+  'LazyUserCategoriesModal': LazyComponent<typeof import("../../components/User/CategoriesModal.vue")['default']>
+  'LazyUserCategoriesPanel': LazyComponent<typeof import("../../components/User/CategoriesPanel.vue")['default']>
+  'LazyUserCategoryBar': LazyComponent<typeof import("../../components/User/CategoryBar.vue")['default']>
+  'LazyUserHeroBanner': LazyComponent<typeof import("../../components/User/HeroBanner.vue")['default']>
+  'LazyUserNavbar': LazyComponent<typeof import("../../components/User/Navbar.vue")['default']>
+  'LazyUserProductGrid': LazyComponent<typeof import("../../components/User/ProductGrid.vue")['default']>
+  'LazyUserSubNavbar': LazyComponent<typeof import("../../components/User/SubNavbar.vue")['default']>
+  'LazyFooter': LazyComponent<typeof import("../../components/footer.vue")['default']>
+  'LazyHeader': LazyComponent<typeof import("../../components/header.vue")['default']>
   'LazyNuxtWelcome': LazyComponent<typeof import("../../node_modules/nuxt/dist/app/components/welcome.vue")['default']>
   'LazyNuxtLayout': LazyComponent<typeof import("../../node_modules/nuxt/dist/app/components/nuxt-layout")['default']>
   'LazyNuxtErrorBoundary': LazyComponent<typeof import("../../node_modules/nuxt/dist/app/components/nuxt-error-boundary.vue")['default']>
@@ -49,7 +67,7 @@ interface _GlobalComponents {
   'LazyNuxtRouteAnnouncer': LazyComponent<typeof import("../../node_modules/nuxt/dist/app/components/nuxt-route-announcer")['default']>
   'LazyNuxtImg': LazyComponent<typeof import("../../node_modules/nuxt/dist/app/components/nuxt-stubs")['NuxtImg']>
   'LazyNuxtPicture': LazyComponent<typeof import("../../node_modules/nuxt/dist/app/components/nuxt-stubs")['NuxtPicture']>
-  'LazyNuxtPage': LazyComponent<typeof import("../../node_modules/nuxt/dist/pages/runtime/page-placeholder")['default']>
+  'LazyNuxtPage': LazyComponent<typeof import("../../node_modules/nuxt/dist/pages/runtime/page")['default']>
   'LazyNoScript': LazyComponent<typeof import("../../node_modules/nuxt/dist/head/runtime/components")['NoScript']>
   'LazyLink': LazyComponent<typeof import("../../node_modules/nuxt/dist/head/runtime/components")['Link']>
   'LazyBase': LazyComponent<typeof import("../../node_modules/nuxt/dist/head/runtime/components")['Base']>
