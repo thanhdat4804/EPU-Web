@@ -1,18 +1,31 @@
 <template>
-  <div class="min-h-screen bg-white text-gray-900">
-    <Navbar />
-    <CategoryBar />
+  <div>
+    <Header />
 
-    <main class="px-8 py-6">
-      <HeroBanner />
-      <ProductGrid />
-    </main>
+    <CategoryMenu
+      :categories="categories"
+      :selected="selectedCategory"
+      @select="selectCategory"
+    />
+
+    <div v-if="loading" class="p-6 text-center text-gray-500">Loading...</div>
+    <div v-else-if="error" class="p-6 text-center text-red-500">{{ error }}</div>
+
+    <div
+      v-else
+      class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-6 p-6 bg-gray-50"
+    >
+      <ProductCard v-for="item in items" :key="item.id" :item="item" />
+    </div>
   </div>
 </template>
 
-<script setup>
-import Navbar from '~/components/User/Navbar.vue'
-import CategoryBar from '~/components/User/CategoryBar.vue'
-import HeroBanner from '~/components/User/HeroBanner.vue'
-import ProductGrid from '~/components/User/ProductGrid.vue'
+<script setup lang="ts">
+import Header from '~/components/User/Header.vue'
+import CategoryMenu from '~/components/User/CategoryMenu.vue'
+import ProductCard from '~/components/User/ProductCard.vue'
+import { useAuctions } from '~/composables/User/useAuctions'
+
+const { categories, items, selectedCategory, selectCategory, loading, error } =
+  useAuctions()
 </script>
