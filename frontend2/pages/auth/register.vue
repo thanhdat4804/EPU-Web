@@ -47,7 +47,7 @@
 
       <p class="text-center mt-4 text-sm">
         Đã có tài khoản?
-        <NuxtLink to="/login" class="text-blue-600 hover:underline">Đăng nhập</NuxtLink>
+        <NuxtLink to="/auth/login" class="text-blue-600 hover:underline">Đăng nhập</NuxtLink>
       </p>
     </div>
   </div>
@@ -69,7 +69,7 @@ const handleRegister = async () => {
       body: { name: name.value, email: email.value, password: password.value }
     })
     alert('Đăng ký thành công!')
-    router.push('/login')
+    router.push('/auth/login')
   } catch (err) {
     alert('Đăng ký thất bại: ' + err?.data?.message || err.message)
   }
