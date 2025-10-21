@@ -60,7 +60,7 @@ const handleLogin = async () => {
     // 🟢 Backend NestJS thường trả về { access_token: '...' }
     const token = res?.access_token || res?.token
     if (token) {
-      localStorage.setItem('jwt', token) // ✅ dùng cùng key với chỗ gọi API
+      localStorage.setItem('token', token)
       alert('Đăng nhập thành công!')
       router.push('/auction/index') // ✅ Redirect sang danh sách đấu giá
     } else {

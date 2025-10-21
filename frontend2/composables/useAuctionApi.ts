@@ -8,7 +8,7 @@ export function useAuctionApi() {
   }
 
   const getAuctionDetail = async (address: string): Promise<any> => {
-  return await $fetch(`${API_BASE}/${address}`)
+  return await $fetch(`${API_BASE}/${address}/detail`)
   }
 
 
@@ -17,7 +17,9 @@ export function useAuctionApi() {
   }
 
   const createAuction = async (auctionData: any): Promise<any> => {
-    const token = localStorage.getItem('jwt')
+    const token = localStorage.getItem('token') // ✅ đổi 'jwt' -> 'token'
+    if (!token) throw new Error('User not logged in')
+
     return await $fetch(`${API_BASE}/create`, {
       method: 'POST',
       headers: {
@@ -28,17 +30,17 @@ export function useAuctionApi() {
   }
 
   const placeBid = async (address: string, amount: number): Promise<any> => {
-  const token = localStorage.getItem('jwt')
-  if (!token) throw new Error('User not logged in')
+    const token = localStorage.getItem('token') // ✅ đổi ở đây luôn
+    if (!token) throw new Error('User not logged in')
 
-  return await $fetch(`${API_BASE}/${address}/bid`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-    body: { amount },
-  })
-}
+    return await $fetch(`${API_BASE}/${address}/bid`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      body: { amount },
+    })
+  }
 
   return { getAuctions, getAuctionDetail, getAllBids, createAuction, placeBid }
 }
