@@ -1,6 +1,8 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common'
 import { ethers } from 'ethers'
 import { PrismaService } from '../../prisma/prisma.service'
+import { Cron } from '@nestjs/schedule';
+import * as crypto from 'crypto';
 
 @Injectable()
 export class BlockchainService {
@@ -24,18 +26,61 @@ export class BlockchainService {
     "function seller() view returns (address)",
     "function actionEndTime() view returns (uint)",
     "function ended() view returns (bool)",
-    "function finalize() public", // ⚡ dùng để gửi tiền cho người bán
-  ]
+    "function finalize() external",
+    "function confirmReceived() external",   // ✅ thêm dòng này
+    "function refundBuyer() external",       // ✅ và dòng này
+    "function withdraw() external returns (bool)", // ✅ optional: nếu bạn gọi withdraw()
+  ];
+
 
   constructor(private readonly prisma: PrismaService) {
-    this.provider = new ethers.providers.JsonRpcProvider('http://127.0.0.1:8545')
+    // ✅ Cách tạo provider đúng cho Hardhat local
+    this.provider = new ethers.providers.JsonRpcProvider('http://127.0.0.1:8545', {
+      name: 'hardhat',
+      chainId: 31337,
+    });
+
+    // 🪙 Wallet admin (tài khoản deploy)
     this.wallet = new ethers.Wallet(
       '0x8b3a350cf5c34c9194ca85829a2df0ec3153be0318b5e2d3348e872092edffba',
-      this.provider
-    )
-    this.factory = new ethers.Contract(this.factoryAddress, this.factoryABI, this.wallet)
-  }
+      this.provider,
+    );
 
+    // 🏭 Contract factory
+    this.factory = new ethers.Contract(this.factoryAddress, this.factoryABI, this.wallet);
+  }
+  @Cron('*/30 * * * * *') // chạy mỗi 30 giây
+  async autoFinalizeAuctions() {
+    const now = new Date();
+
+    const expiredAuctions = await this.prisma.auction.findMany({
+      where: {
+        endTime: { lte: now },
+        status: 'Active',
+      },
+    });
+
+    for (const auc of expiredAuctions) {
+      try {
+        const auctionContract = new ethers.Contract(auc.contractAddress, this.auctionABI, this.wallet);
+
+        const ended = await auctionContract.ended();
+        if (!ended) {
+          const tx = await auctionContract.finalize();
+          await tx.wait();
+
+          await this.prisma.auction.update({
+            where: { id: auc.id },
+            data: { status: 'Ended' },
+          });
+
+          console.log(`✅ Finalized auction: ${auc.contractAddress}`);
+        }
+      } catch (err) {
+        console.error(`❌ Failed to finalize ${auc.contractAddress}:`, err.message);
+      }
+    }
+  }
   // 🟢 Tạo đấu giá mới
   async createAuction(data: any, userId: number) {
     const tx = await this.factory.createAction(data.duration)
@@ -118,27 +163,34 @@ export class BlockchainService {
     };
   }
 
-  // 🟢 Đặt giá
   async placeBid(contractAddress: string, amount: number, userId: number) {
     const bidder = await this.prisma.user.findUnique({ where: { id: userId } })
-    if (!bidder || !bidder.wallet)
-      throw new NotFoundException('Wallet address not found for bidder')
+    if (!bidder || !bidder.privatekey)
+      throw new NotFoundException('Wallet or private key not found')
 
-    const auctionContract = new ethers.Contract(contractAddress, this.auctionABI, this.wallet)
-    const tx = await auctionContract.bid({ value: ethers.utils.parseEther(amount.toString()) })
+    // 🔑 Giải mã private key của user
+    const decryptedKey = this.decryptPrivateKey(bidder.privatekey)
+    const bidderWallet = new ethers.Wallet(decryptedKey, this.provider)
+
+    // 🪙 Gọi contract bằng ví user (không dùng this.wallet nữa)
+    const auctionContract = new ethers.Contract(contractAddress, this.auctionABI, bidderWallet)
+    const tx = await auctionContract.bid({
+      value: ethers.utils.parseEther(amount.toString()),
+    })
     await tx.wait()
+
+    if (!bidder.wallet) throw new Error('User wallet not found')
 
     return this.prisma.transaction.create({
       data: {
         txHash: tx.hash,
-        fromAddress: bidder.wallet,
+        fromAddress: bidder.wallet, // ✅ bây giờ TS biết chắc là string
         toAddress: contractAddress,
         amount,
         auction: { connect: { contractAddress } },
       },
     })
   }
-
   // 🟢 Lấy tất cả bids
   async getAllBids(contractAddress: string) {
     const auction = new ethers.Contract(contractAddress, this.auctionABI, this.wallet)
@@ -151,25 +203,40 @@ export class BlockchainService {
 
     return result.sort((a, b) => b.amount - a.amount)
   }
+  private decryptPrivateKey(encrypted: string): string {
+    const ENCRYPTION_KEY = process.env.PRIVATE_KEY_ENCRYPTION_KEY!
+    const IV_LENGTH = 16
+    const [ivHex, encryptedText] = encrypted.split(':')
+    const iv = Buffer.from(ivHex, 'hex')
+    const decipher = crypto.createDecipheriv(
+      'aes-256-cbc',
+      Buffer.from(ENCRYPTION_KEY, 'hex'),
+      iv,
+    )
+    let decrypted = decipher.update(encryptedText, 'hex', 'utf8')
+    decrypted += decipher.final('utf8')
+    return decrypted
+  }
 
-  // 🟢 Buyer xác nhận đã nhận hàng → hệ thống tự động gửi tiền cho seller
   async confirmReceived(contractAddress: string, userId: number) {
     const user = await this.prisma.user.findUnique({ where: { id: userId } })
-    if (!user) throw new NotFoundException('User not found')
-
-    const auctionContract = new ethers.Contract(contractAddress, this.auctionABI, this.wallet)
-
-    // ✅ Kiểm tra contract có ended chưa
-    const ended = await auctionContract.ended()
-    if (!ended) {
-      throw new BadRequestException('Auction has not ended yet')
+    if (!user || !user.privatekey) throw new NotFoundException('User not found or wallet missing')
+    console.log('Wallet:', user.wallet)
+    // ✅ Giải mã private key trước khi tạo signer
+    const decryptedKey = this.decryptPrivateKey(user.privatekey)
+    if (!decryptedKey.startsWith('0x')) {
+      throw new BadRequestException('Decrypted key invalid format')
     }
 
-    // ✅ Thực hiện finalize() để gửi tiền cho seller
-    const tx = await auctionContract.finalize()
+    const signer = new ethers.Wallet(decryptedKey, this.provider)
+    const auctionContract = new ethers.Contract(contractAddress, this.auctionABI, signer)
+
+    const ended = await auctionContract.ended()
+    if (!ended) throw new BadRequestException('Auction has not ended yet')
+
+    const tx = await auctionContract.confirmReceived()
     const receipt = await tx.wait()
 
-    // ✅ Cập nhật DB
     await this.prisma.auction.update({
       where: { contractAddress },
       data: { status: 'Completed' },
