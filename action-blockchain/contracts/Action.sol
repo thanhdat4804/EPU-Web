@@ -18,8 +18,10 @@ contract Action {
     event ItemReceived(address buyer, uint amount);
     event Refunded(address buyer, uint amount);
 
-    constructor(uint _biddingTime) {
-        seller = msg.sender;
+    // ✅ thêm seller vào constructor
+    constructor(uint _biddingTime, address _seller) {
+        require(_seller != address(0), "Invalid seller address");
+        seller = _seller;
         actionEndTime = block.timestamp + _biddingTime;
     }
 
@@ -27,7 +29,7 @@ contract Action {
         require(block.timestamp < actionEndTime, "Auction already ended");
         require(msg.value > highestBid, "Bid not high enough");
 
-        // hoàn tiền cho bidder cũ
+        // Hoàn tiền cho bidder cũ
         if (highestBid != 0) {
             pendingReturns[highestBidder] += highestBid;
         }
@@ -59,18 +61,22 @@ contract Action {
         ended = true;
         emit ActionEnded(highestBidder, highestBid);
 
-        // ⚠️ KHÔNG gửi tiền cho seller ngay
-        // tiền sẽ được giữ lại trong contract cho tới khi buyer xác nhận
+        // ⚠️ Không gửi tiền cho seller ngay
+        // Tiền sẽ được giữ lại trong contract cho tới khi buyer xác nhận
     }
 
-    // ✅ Buyer xác nhận đã nhận hàng
     function confirmReceived() external {
         require(ended, "Auction not ended");
         require(msg.sender == highestBidder, "Only winner can confirm");
         require(!isPaidToSeller, "Already paid to seller");
+        require(highestBid > 0, "No bid to pay");
+        require(seller != address(0), "Seller invalid");
 
         isPaidToSeller = true;
-        payable(seller).transfer(highestBid);
+
+        // ✅ Dùng call để gửi tiền, an toàn hơn transfer()
+        (bool success, ) = payable(seller).call{value: highestBid}("");
+        require(success, "Transfer failed");
 
         emit ItemReceived(highestBidder, highestBid);
     }

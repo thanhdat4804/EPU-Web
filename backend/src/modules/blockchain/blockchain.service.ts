@@ -10,13 +10,13 @@ export class BlockchainService {
   private wallet: ethers.Wallet
   private factory: ethers.Contract
 
-  private factoryAddress = '0x5FbDB2315678afecb367f032d93F642f64180aa3'
+  private factoryAddress = '0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0'
 
   private factoryABI = [
-    "function createAction(uint _biddingTime) public",
-    "function getAllActions() public view returns (address[] memory)",
-    "event ActionCreated(address indexed seller, address actionAddress, uint endTime)"
-  ]
+  "function createAction(uint _biddingTime, address _seller) public",
+  "function getAllActions() public view returns (address[] memory)",
+  "event ActionCreated(address indexed seller, address actionAddress, uint endTime)",
+  ];
 
   private auctionABI = [
     "function bid() payable",
@@ -30,6 +30,7 @@ export class BlockchainService {
     "function confirmReceived() external",   // ✅ thêm dòng này
     "function refundBuyer() external",       // ✅ và dòng này
     "function withdraw() external returns (bool)", // ✅ optional: nếu bạn gọi withdraw()
+    "function pendingReturns(address) view returns (uint256)"
   ];
 
 
@@ -48,6 +49,69 @@ export class BlockchainService {
 
     // 🏭 Contract factory
     this.factory = new ethers.Contract(this.factoryAddress, this.factoryABI, this.wallet);
+  }
+  // 🟢 Tự động hoàn tiền cho người thua
+  private async autoRefundLosers(contractAddress: string) {
+    try {
+      const auctionContract = new ethers.Contract(contractAddress, this.auctionABI, this.wallet);
+
+      // Lấy danh sách bidder & highestBidder
+      const [bidders, amounts] = await auctionContract.getAllBids();
+      const highestBidder: string = await auctionContract.highestBidder();
+
+      for (let i = 0; i < bidders.length; i++) {
+        const bidderAddr: string = bidders[i];
+        // bỏ qua winner
+        if (bidderAddr.toLowerCase() === highestBidder.toLowerCase()) continue;
+
+        try {
+          // Lấy pending amount (BigNumber)
+          const pending: ethers.BigNumber = await auctionContract.pendingReturns(bidderAddr);
+
+          if (!pending || pending.lte(0)) {
+            // không cần refund
+            continue;
+          }
+
+          // Tìm user trong DB theo wallet (bạn lưu địa chỉ wallet ở user.wallet)
+          const user = await this.prisma.user.findUnique({ where: { wallet: bidderAddr } });
+          if (!user || !user.privatekey) {
+            console.warn(`No user/privatekey for ${bidderAddr}, skipping refund.`);
+            continue;
+          }
+
+          // Giải mã private key (dùng hàm decrypt của bạn)
+          const decryptedKey = this.decryptPrivateKey(user.privatekey);
+          // Tạo signer bằng private key của bidder
+          const bidderWallet = new ethers.Wallet(decryptedKey, this.provider);
+
+          // Connect contract với signer (để withdraw với from = bidder)
+          const contractWithBidder = auctionContract.connect(bidderWallet);
+
+          console.log(`↩️ Refunding ${ethers.utils.formatEther(pending)} ETH to ${bidderAddr}...`);
+          const tx = await contractWithBidder.withdraw();
+          const receipt = await tx.wait();
+          console.log(`✅ Refunded ${bidderAddr} (tx: ${receipt.transactionHash})`);
+
+          // Tuỳ chọn: lưu transaction vào DB
+          await this.prisma.transaction.create({
+            data: {
+              txHash: receipt.transactionHash,
+              fromAddress: bidderAddr,
+              toAddress: contractAddress,
+              amount: parseFloat(ethers.utils.formatEther(pending)),
+              auction: { connect: { contractAddress } },
+            }
+          });
+
+        } catch (innerErr) {
+          console.error(`❌ Refund failed for ${bidderAddr}:`, innerErr?.message || innerErr);
+          // tiếp tục với bidder tiếp theo
+        }
+      }
+    } catch (err) {
+      console.error(`❌ Auto refund failed for ${contractAddress}:`, err?.message || err);
+    }
   }
   @Cron('*/30 * * * * *') // chạy mỗi 30 giây
   async autoFinalizeAuctions() {
@@ -75,6 +139,7 @@ export class BlockchainService {
           });
 
           console.log(`✅ Finalized auction: ${auc.contractAddress}`);
+          await this.autoRefundLosers(auc.contractAddress);
         }
       } catch (err) {
         console.error(`❌ Failed to finalize ${auc.contractAddress}:`, err.message);
@@ -83,17 +148,20 @@ export class BlockchainService {
   }
   // 🟢 Tạo đấu giá mới
   async createAuction(data: any, userId: number) {
-    const tx = await this.factory.createAction(data.duration)
-    const receipt = await tx.wait()
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user || !user.wallet) throw new BadRequestException('Seller wallet missing');
 
-    let newAuctionAddress: string | null = null
+    // ✅ Truyền ví của người bán vào contract
+    const tx = await this.factory.createAction(data.duration, user.wallet);
+    const receipt = await tx.wait();
+
+    let newAuctionAddress: string | null = null;
     for (const ev of receipt.events || []) {
       if (ev.event === 'ActionCreated') {
-        newAuctionAddress = ev.args?.actionAddress || ev.args?.[1]
-        break
+        newAuctionAddress = ev.args?.actionAddress || ev.args?.[1];
+        break;
       }
     }
-
     if (!newAuctionAddress) throw new Error('Không tìm thấy địa chỉ đấu giá mới!')
 
     const item = await this.prisma.item.create({
