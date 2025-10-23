@@ -1,64 +1,84 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Param,
-  Body,
-  Req,
-  UseGuards,
-  BadRequestException,
-} from '@nestjs/common'
-import { BlockchainService } from './blockchain.service'
-import { JwtAuthGuard } from '../auth/jwt-auth.guard'
+import { Controller, Post, Get, Body, Param, Req, UseGuards } from '@nestjs/common';
+import { BlockchainService } from './blockchain.service';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @Controller('auction')
 export class BlockchainController {
   constructor(private readonly blockchainService: BlockchainService) {}
 
-  // 🟢 Lấy tất cả các phiên đấu giá
+  // 🟢 Lấy danh sách đấu giá
   @Get('list')
   async getAllAuctions() {
     return this.blockchainService.getAllAuctions();
   }
 
-  // 🟢 Lấy chi tiết 1 phiên đấu giá (theo contract address)
+  // 🟢 Chi tiết 1 đấu giá
   @Get(':address/detail')
   async getAuctionDetail(@Param('address') address: string) {
-    if (!address) throw new BadRequestException('Missing contract address')
     return this.blockchainService.getAuctionDetail(address);
   }
 
-  // 🟢 Tạo phiên đấu giá mới
+  // 🟢 Tạo đấu giá
   @UseGuards(JwtAuthGuard)
   @Post('create')
-  async createAuction(@Body() body: any, @Req() req: any) {
-    const userId = req.user.id;
-    return this.blockchainService.createAuction(body, userId);
+  async createAuction(@Body() data: any, @Req() req: any) {
+    return this.blockchainService.createAuction(data, req.user.id);
   }
 
-  // 🟢 Đặt giá (bid)
+  // 🟢 Đặt giá — chỉ cần gửi amount, backend tự tính deposit = 10%
   @UseGuards(JwtAuthGuard)
   @Post(':address/bid')
   async placeBid(
     @Param('address') address: string,
     @Body('amount') amount: number,
-    @Req() req: any
+    @Req() req: any,
   ) {
-    const userId = req.user.id;
-    return this.blockchainService.placeBid(address, amount, userId);
+    return this.blockchainService.placeBid(address, amount, req.user.id);
   }
 
-  // 🟢 Lấy danh sách các bid của 1 phiên đấu giá
-  @Get(':address/bids')
-  async getAllBids(@Param('address') address: string) {
-    return this.blockchainService.getAllBids(address);
+  @Post(':address/pay')
+  @UseGuards(JwtAuthGuard)
+  async payWinningBid(@Param('address') address: string, @Req() req: any) {
+    return this.blockchainService.payWinningBid(address, req.user.id);
   }
 
-  // 🟢 Buyer xác nhận đã nhận hàng → trả tiền cho seller
+  // 🟢 Buyer xác nhận nhận hàng
   @UseGuards(JwtAuthGuard)
   @Post(':address/confirm')
   async confirmReceived(@Param('address') address: string, @Req() req: any) {
-    const userId = req.user.id;
-    return this.blockchainService.confirmReceived(address, userId);
+    return this.blockchainService.confirmReceived(address, req.user.id);
+  }
+
+  // 🟢 Mở tranh chấp
+  @UseGuards(JwtAuthGuard)
+  @Post(':address/dispute')
+  async openDispute(@Param('address') address: string, @Req() req: any) {
+    return this.blockchainService.openDispute(address, req.user.id);
+  }
+
+  // 🟢 Seller hoàn tiền cho buyer
+  @UseGuards(JwtAuthGuard)
+  @Post(':address/refund')
+  async refundBuyer(@Param('address') address: string, @Req() req: any) {
+    return this.blockchainService.refundBuyer(address, req.user.id);
+  }
+
+  // 🟢 Phạt người thắng không thanh toán
+  @Post(':address/penalize')
+  async penalizeWinner(@Param('address') address: string) {
+    return this.blockchainService.penalizeWinner(address);
+  }
+
+  // 🟢 Người thua rút lại cọc
+  @UseGuards(JwtAuthGuard)
+  @Post(':address/withdraw')
+  async withdrawDeposit(@Param('address') address: string, @Req() req: any) {
+    return this.blockchainService.withdrawDeposit(address, req.user.id);
+  }
+
+  // 🟢 Lấy danh sách đặt giá
+  @Get(':address/bids')
+  async getAllBids(@Param('address') address: string) {
+    return this.blockchainService.getAllBids(address);
   }
 }
