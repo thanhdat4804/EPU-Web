@@ -21,7 +21,7 @@ function decryptPrivateKey(encrypted: string, encryptionKeyHex: string): string 
 // --- Usage example ---
 async function main() {
   const ENCRYPTION_KEY = process.env.PRIVATE_KEY_ENCRYPTION_KEY!;
-  const encrypted = '659475dda539580e48c289f7746d0b9a:49bd87457d0375468a465ec3d7b378d547a146f3cd4345b7e8296243bdd9e24d4e8713df597c393b9aee1afe72fe5af87705691f3058226a50fd35ff43257fa1fea2782ce05291b5c0946e13d036b0b5';
+  const encrypted = 'bd43bf58302301dc14082cf1d33617b4:953ea9b1d739dc825d6b9d80e411d830d8c816d26c815c3af074e4305af13583132f192d313fd6c3babc07b0747edb00b804dd57328f68bdb422c200c8e5fb35dce0b0a574f2f601246cd17775c39e8e';
 
   if (!ENCRYPTION_KEY) {
     console.error('Set PRIVATE_KEY_ENCRYPTION_KEY in env before running.');

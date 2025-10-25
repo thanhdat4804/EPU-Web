@@ -7,7 +7,8 @@ import { TransactionModule } from './modules/transaction/transaction.module';
 import { UserModule } from './modules/user/user.module';
 import { CategoryModule } from './modules/category/category.module';
 import { ItemModule } from './modules/item/item.module';
+import { ScheduleModule } from '@nestjs/schedule';
 @Module({
-  imports: [PrismaModule, BlockchainModule, AuthModule, WalletModule, TransactionModule, UserModule, CategoryModule, ItemModule],
+  imports: [ScheduleModule.forRoot(), PrismaModule, BlockchainModule, AuthModule, WalletModule, TransactionModule, UserModule, CategoryModule, ItemModule],
 })
 export class AppModule {}
