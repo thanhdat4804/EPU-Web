@@ -1,21 +1,20 @@
 <template>
   <header class="bg-white shadow-sm sticky top-0 z-50">
-    <div class="flex items-center justify-between px-8 py-4">
+    <div class="flex items-center justify-between px-8 py-4 relative">
       <!-- Logo -->
-      <NuxtLink to="/User" class="text-2xl font-bold text-blue-600 select-none hover:text-blue-700 transition">
+      <NuxtLink to="/User" class="text-2xl font-bold text-blue-600 select-none">
         BidDora
       </NuxtLink>
 
-      <!-- Thanh tìm kiếm ở giữa -->
-      <div class="flex-1 flex justify-center">
-        <div
-          class="relative w-full max-w-lg transition-all duration-300 focus-within:scale-[1.02]"
-        >
+      <!-- Thanh tìm kiếm -->
+      <div class="flex-1 flex justify-center relative">
+        <div class="relative w-full max-w-lg transition-all duration-300">
           <input
             v-model="search"
             type="text"
-            placeholder="Search for items..."
+            placeholder="Tìm kiếm vật phẩm đấu giá..."
             class="w-full border border-gray-300 rounded-full py-2 px-4 pl-10 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent"
+            @input="handleSearch"
           />
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -31,64 +30,64 @@
               d="M21 21l-4.35-4.35m0 0A7.5 7.5 0 1016.65 16.65z"
             />
           </svg>
+
+          <!-- Dropdown kết quả tìm kiếm -->
+          <div
+            v-if="searchResults.length && search.trim()"
+            class="absolute left-0 right-0 bg-white border rounded-lg shadow-md mt-2 z-50 max-h-64 overflow-y-auto"
+          >
+            <div
+              v-for="item in searchResults"
+              :key="item.id"
+              @click="goToItem(item.id)"
+              class="flex items-center space-x-3 px-4 py-2 hover:bg-gray-100 cursor-pointer transition"
+            >
+              <img
+                :src="item.imageUrl || '/no-image.jpg'"
+                alt=""
+                class="w-10 h-10 object-cover rounded"
+              />
+              <div class="flex-1">
+                <p class="font-medium text-gray-800 truncate">{{ item.name }}</p>
+                <p class="text-xs text-gray-500 truncate">
+                  {{ formatPrice(item.currentPrice || item.startingPrice) }}
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
-      <!-- Nút đăng nhập/đăng ký hoặc thông tin user -->
-      <div class="space-x-4 relative">
-        <!-- Nếu user chưa đăng nhập -->
+      <!-- Khu vực người dùng -->
+      <div class="space-x-4 flex items-center">
+        <!-- Nếu chưa đăng nhập -->
         <template v-if="!user">
-          <NuxtLink to="/auth/login" class="text-sm text-gray-600 hover:text-blue-600 transition">
-            Sign in
+          <NuxtLink
+            to="/auth/login"
+            class="text-sm text-gray-600 hover:text-blue-600 transition"
+          >
+            Đăng nhập
           </NuxtLink>
           <NuxtLink
             to="/auth/register"
             class="bg-blue-600 text-white px-4 py-2 rounded-full text-sm hover:bg-blue-700 transition"
           >
-            Register
+            Đăng ký
           </NuxtLink>
         </template>
 
-        <!-- Nếu user đã đăng nhập -->
+        <!-- Nếu đã đăng nhập -->
         <template v-else>
+          <div class="flex items-center space-x-2 bg-gray-100 px-3 py-1 rounded-full">
+            <i class="fas fa-user text-gray-600"></i>
+            <span class="font-medium text-gray-800 text-sm">{{ user.username }}</span>
+          </div>
           <button
-            @click="toggleMenu"
-            class="flex items-center gap-2 text-sm text-gray-700 hover:text-blue-600 transition focus:outline-none"
+            @click="logout"
+            class="text-sm text-red-500 hover:text-red-600 font-medium"
           >
-            <span class="material-icons text-lg">account_circle</span>
-            <span>{{ user.name }}</span>
-            <span class="material-icons text-sm">expand_more</span>
+            Đăng xuất
           </button>
-
-          <!-- Dropdown menu -->
-          <transition name="fade">
-            <div
-              v-if="showMenu"
-              class="absolute right-0 mt-2 w-48 bg-white border rounded-lg shadow-md py-2 z-50"
-            >
-              <NuxtLink
-                to="/User/profile"
-                class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                @click="closeMenu"
-              >
-                Profile
-              </NuxtLink>
-              <NuxtLink
-                to="/User/settings"
-                class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                @click="closeMenu"
-              >
-                Settings
-              </NuxtLink>
-              <hr class="my-1" />
-              <button
-                @click="handleLogout"
-                class="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100"
-              >
-                Sign out
-              </button>
-            </div>
-          </transition>
         </template>
       </div>
     </div>
@@ -96,29 +95,59 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
-import { useAuth } from '~/composables/User/useAuth'
+import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 
+const router = useRouter()
 const search = ref('')
-const { user, logout } = useAuth()
+const searchResults = ref([])
+const user = ref(null)
+let timeout = null
 
-const showMenu = ref(false)
-const toggleMenu = () => (showMenu.value = !showMenu.value)
-const closeMenu = () => (showMenu.value = false)
+onMounted(() => {
+  const storedUser = localStorage.getItem('user')
+  if (storedUser) {
+    user.value = JSON.parse(storedUser)
+  }
+})
 
-const handleLogout = () => {
-  logout()
-  closeMenu()
+const handleSearch = async () => {
+  clearTimeout(timeout)
+  if (!search.value.trim()) {
+    searchResults.value = []
+    return
+  }
+
+  // debounce 300ms tránh spam API
+  timeout = setTimeout(async () => {
+    try {
+      const res = await $fetch(`http://localhost:3001/items?search=${encodeURIComponent(search.value)}`)
+      searchResults.value = res
+    } catch (err) {
+      console.error('Lỗi khi tìm kiếm:', err)
+      searchResults.value = []
+    }
+  }, 300)
+}
+
+const goToItem = (id) => {
+  search.value = ''
+  searchResults.value = []
+  router.push(`/User/item/${id}`)
+}
+
+const logout = () => {
+  localStorage.removeItem('jwt')
+  localStorage.removeItem('user')
+  user.value = null
+  window.location.reload()
+}
+
+const formatPrice = (price) => {
+  if (!price) return '—'
+  return new Intl.NumberFormat('vi-VN', {
+    style: 'currency',
+    currency: 'VND'
+  }).format(price)
 }
 </script>
-
-<style scoped>
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity 0.15s ease;
-}
-.fade-enter-from,
-.fade-leave-to {
-  opacity: 0;
-}
-</style>
