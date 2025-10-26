@@ -18,7 +18,7 @@ contract Action {
     bool public ended;                // Đấu giá đã kết thúc hay chưa
     bool public isPaidToSeller;       // Đã thanh toán cho người bán chưa
     bool public isDisputed;           // Có tranh chấp không
-
+    bool public isPenalized;
     uint public constant DEPOSIT_RATE = 10; // 10% đặt cọc bắt buộc
 
     struct Bid {
@@ -106,16 +106,18 @@ contract Action {
         require(ended, "Auction not ended");
         require(msg.sender == highestBidder, "Only winner can pay");
         require(!isPaidToSeller, "Already paid");
-        require(!isDisputed, "Under dispute");
+        require(!isPenalized, "Winner has been penalized and cannot pay now"); // ✅ CHẶN !!!
 
         uint deposit = bids[msg.sender].deposit;
         uint remaining = highestBid - deposit;
         require(msg.value == remaining, "Must pay remaining balance");
 
-        // 💰 Tiền được giữ lại trong contract, chưa gửi cho seller
-        isPaidToSeller = false; // vẫn giữ là false
+        isPaidToSeller = true;
+        payable(seller).transfer(highestBid);
+
         emit PaymentMade(msg.sender, highestBid);
     }
+
 
     function confirmReceived() external {
         require(msg.sender == highestBidder, "Only buyer can confirm");
@@ -158,7 +160,8 @@ contract Action {
     function penalizeWinner() external {
         require(ended, "Auction not ended");
         require(!isPaidToSeller, "Already paid");
-        require(block.timestamp > actionEndTime + 1 days, "Too early");
+        require(!isPenalized, "Already penalized");
+        require(block.timestamp > actionEndTime + 1 minutes, "Too early to penalize");
 
         Bid storage bidInfo = bids[highestBidder];
         uint penalty = bidInfo.deposit;
@@ -167,8 +170,11 @@ contract Action {
         bidInfo.deposit = 0;
         payable(seller).transfer(penalty);
 
+        isPenalized = true; // ✅ đánh dấu phạt xong rồi
+
         emit Penalized(highestBidder, penalty);
     }
+
 
     /**
      * @dev Người thua có thể rút lại tiền cọc sau khi đấu giá kết thúc
