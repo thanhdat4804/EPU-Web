@@ -114,7 +114,43 @@ export class BlockchainService {
       }
     }
   }
+  // 🕒 Tự động phạt người thắng nếu không thanh toán
+  @Cron(CronExpression.EVERY_MINUTE)
+  async autoPenalizeWinners() {
+    const now = Math.floor(Date.now() / 1000);
 
+    const auctions = await this.prisma.auction.findMany({
+      where: { status: 'Ended' }, // chỉ kiểm tra đấu giá đã kết thúc
+    });
+
+    for (const a of auctions) {
+      try {
+        const auction = new ethers.Contract(a.contractAddress, this.auctionABI, this.wallet);
+
+        const ended = await auction.ended();
+        const highestBidder = await auction.highestBidder();
+        const highestBid = await auction.highestBid();
+        const endTime = await auction.actionEndTime();
+        const isPaid = await auction.isPaidToSeller?.().catch(() => false);
+
+        // ⛔ Nếu chưa thanh toán & đã quá hạn 1 phút
+        if (ended && !isPaid && now > endTime.toNumber() + 60) {
+          const tx = await auction.penalizeWinner();
+          await tx.wait();
+
+          this.logger.warn(`⚠️ Winner penalized for auction: ${a.contractAddress}`);
+
+          // Cập nhật DB → đấu giá bị hủy, item trả về seller
+          await this.prisma.auction.update({
+            where: { id: a.id },
+            data: { status: 'Penalized' },
+          });
+        }
+      } catch (e) {
+        this.logger.error(`❌ autoPenalizeWinners error: ${e.message}`);
+      }
+    }
+  }
   // ======================================
   // 🟢 Lấy danh sách đấu giá
   // ======================================

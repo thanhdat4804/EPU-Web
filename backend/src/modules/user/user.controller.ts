@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Patch, Body, Delete, UseGuards, ParseIntPipe } from '@nestjs/common';
+import { Controller, Get, Param, Patch, Body, Delete, UseGuards, ParseIntPipe, Req } from '@nestjs/common';
 import { UserService } from './user.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
@@ -15,7 +15,11 @@ export class UserController {
   async getAllUsers() {
     return this.userService.getAllUsers();
   }
-
+  
+  @Get('me')
+  getProfile(@Req() req) {
+    return this.userService.getUserFromToken(req.headers.authorization);
+  }
   // 🟢 Xem chi tiết user
   @Get(':id')
   @Roles('Admin')
@@ -29,4 +33,6 @@ export class UserController {
   async deleteUser(@Param('id', ParseIntPipe) id: number) {
     return this.userService.deleteUser(id);
   }
+ 
+  
 }
