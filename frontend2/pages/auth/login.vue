@@ -45,10 +45,12 @@
 <script setup>
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { useAuth } from '~/composables/User/useAuth' // 🟢 dùng composable
 
 const email = ref('')
 const password = ref('')
 const router = useRouter()
+const { login } = useAuth() // lấy hàm login từ useAuth
 
 const handleLogin = async () => {
   try {
@@ -57,15 +59,18 @@ const handleLogin = async () => {
       body: { email: email.value, password: password.value }
     })
 
-    // 🟢 Backend NestJS thường trả về { access_token: '...' }
-    const token = res?.access_token || res?.token
-    if (token) {
-      localStorage.setItem('jwt', token) // ✅ dùng cùng key với chỗ gọi API
-      alert('Đăng nhập thành công!')
-      router.push('/User') // ✅ Redirect sang danh sách đấu giá
-    } else {
+    // 🟢 Backend trả về { token, user }
+    const token = res?.token || res?.access_token
+    if (!token) {
       alert('Không nhận được token từ server')
+      return
     }
+
+    // ✅ Gọi useAuth.login() để lưu token và lấy thông tin user
+    await login(token)
+
+    alert('Đăng nhập thành công!')
+    router.push('/User') // hoặc trang bạn muốn
   } catch (err) {
     console.error(err)
     alert('Đăng nhập thất bại: ' + (err?.data?.message || err.message))

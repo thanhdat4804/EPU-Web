@@ -78,9 +78,12 @@
 
         <!-- Nếu đã đăng nhập -->
         <template v-else>
-          <div class="flex items-center space-x-2 bg-gray-100 px-3 py-1 rounded-full">
+          <div
+            @click="goToProfile"
+            class="flex items-center space-x-2 bg-gray-100 px-3 py-1 rounded-full cursor-pointer hover:bg-gray-200 transition"
+          >
             <i class="fas fa-user text-gray-600"></i>
-            <span class="font-medium text-gray-800 text-sm">{{ user.username }}</span>
+            <span class="font-medium text-gray-800 text-sm">{{ user.name }}</span>
           </div>
           <button
             @click="logout"
@@ -104,10 +107,22 @@ const searchResults = ref([])
 const user = ref(null)
 let timeout = null
 
-onMounted(() => {
-  const storedUser = localStorage.getItem('user')
-  if (storedUser) {
-    user.value = JSON.parse(storedUser)
+onMounted(async () => {
+  const token = localStorage.getItem('jwt')
+  if (!token) return
+
+  try {
+    const userData = await $fetch('http://localhost:3001/users/me', {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    })
+    user.value = userData
+    localStorage.setItem('user', JSON.stringify(userData))
+  } catch (err) {
+    console.error('Không thể tải thông tin user:', err)
+    localStorage.removeItem('jwt')
+    localStorage.removeItem('user')
   }
 })
 
@@ -118,10 +133,11 @@ const handleSearch = async () => {
     return
   }
 
-  // debounce 300ms tránh spam API
   timeout = setTimeout(async () => {
     try {
-      const res = await $fetch(`http://localhost:3001/items?search=${encodeURIComponent(search.value)}`)
+      const res = await $fetch(
+        `http://localhost:3001/items?search=${encodeURIComponent(search.value)}`
+      )
       searchResults.value = res
     } catch (err) {
       console.error('Lỗi khi tìm kiếm:', err)
@@ -136,6 +152,10 @@ const goToItem = (id) => {
   router.push(`/User/item/${id}`)
 }
 
+const goToProfile = () => {
+  router.push('/User/profile')
+}
+
 const logout = () => {
   localStorage.removeItem('jwt')
   localStorage.removeItem('user')
@@ -145,7 +165,9 @@ const logout = () => {
 
 const formatPrice = (price) => {
   if (!price) return '—'
-  return `${Number(price).toLocaleString('en-US', { minimumFractionDigits: 4, maximumFractionDigits: 4 })} ETH`
+  return `${Number(price).toLocaleString('en-US', {
+    minimumFractionDigits: 4,
+    maximumFractionDigits: 4,
+  })} ETH`
 }
-
 </script>

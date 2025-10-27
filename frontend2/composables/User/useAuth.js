@@ -1,51 +1,46 @@
-import { useState } from '#app'
+// ~/composables/useAuth.ts
+import { useState, useNuxtApp } from '#app'
 
 export const useAuth = () => {
   const user = useState('user', () => null)
+  const { $fetch } = useNuxtApp()
 
-  const getUserInfo = async (token) => {
+  // 🟢 Gọi sau khi đăng nhập thành công
+  const login = async (token) => {
+    localStorage.setItem('jwt', token)
     try {
       const userData = await $fetch('http://localhost:3001/users/me', {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
+        headers: { Authorization: `Bearer ${token}` },
       })
       user.value = userData
       localStorage.setItem('user', JSON.stringify(userData))
     } catch (err) {
-      console.error('Lỗi khi lấy thông tin user:', err)
+      console.error('Lỗi lấy user:', err)
       user.value = null
-      localStorage.removeItem('user')
     }
   }
 
-  const login = async (email, password) => {
+  // 🟡 Dùng khi reload trang
+  const loadUserFromStorage = async () => {
+    const token = localStorage.getItem('jwt')
+    if (!token) return
     try {
-      const res = await $fetch('http://localhost:3001/auth/login', {
-        method: 'POST',
-        body: { email, password }
+      const userData = await $fetch('http://localhost:3001/users/me', {
+        headers: { Authorization: `Bearer ${token}` },
       })
-      const token = res?.access_token || res?.token
-      if (!token) throw new Error('Không có token trả về')
-      localStorage.setItem('jwt', token)
-      await getUserInfo(token)
-      return { ok: true }
-    } catch (err) {
-      console.error('Lỗi đăng nhập:', err)
-      return { ok: false, message: err?.data?.message || err.message }
+      user.value = userData
+    } catch {
+      localStorage.removeItem('jwt')
+      user.value = null
     }
   }
 
+  // 🔴 Đăng xuất
   const logout = () => {
     localStorage.removeItem('jwt')
     localStorage.removeItem('user')
     user.value = null
-  }
-
-  const loadUserFromStorage = async () => {
-    const token = localStorage.getItem('jwt')
-    if (!token) return
-    await getUserInfo(token)
+    window.location.reload()
   }
 
   return { user, login, logout, loadUserFromStorage }
