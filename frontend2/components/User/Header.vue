@@ -145,9 +145,7 @@ const logout = () => {
 
 const formatPrice = (price) => {
   if (!price) return '—'
-  return new Intl.NumberFormat('vi-VN', {
-    style: 'currency',
-    currency: 'VND'
-  }).format(price)
+  return `${Number(price).toLocaleString('en-US', { minimumFractionDigits: 4, maximumFractionDigits: 4 })} ETH`
 }
+
 </script>
