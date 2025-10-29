@@ -1,160 +1,420 @@
-import { Injectable, NotFoundException } from '@nestjs/common'
-import { ethers } from 'ethers';
+import { Injectable, BadRequestException, NotFoundException, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-
+import { ethers } from 'ethers';
+import * as crypto from 'crypto';
+import { Cron, CronExpression } from '@nestjs/schedule';
 @Injectable()
 export class BlockchainService {
   private provider: ethers.providers.JsonRpcProvider;
   private wallet: ethers.Wallet;
   private factory: ethers.Contract;
-  private factoryAddress = '0x5FbDB2315678afecb367f032d93F642f64180aa3';
+  private readonly logger = new Logger(BlockchainService.name);
+  private factoryAddress = '0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0';
 
   private factoryABI = [
-    "function createAction(uint _biddingTime) public",
-    "function getAllActions() public view returns (address[] memory)",
-    "event ActionCreated(address indexed seller, address actionAddress, uint endTime)"
+    'function createAction(uint _biddingTime, address _seller) public',
+    'function getAllActions() public view returns (address[] memory)',
+    'event ActionCreated(address indexed seller, address actionAddress, uint endTime)',
   ];
 
   private auctionABI = [
-    "function bid() payable",
-    "function getAllBids() view returns (address[] memory, uint[] memory)",
-    "function highestBid() view returns (uint)",
-    "function highestBidder() view returns (address)",
-    "function seller() view returns (address)",
-    "function actionEndTime() view returns (uint)",
-    "function ended() view returns (bool)"
+    'function placeBid(uint _amount) payable',
+    'function payWinningBid() payable',
+    "function bids(address) view returns (uint amount, uint deposit, bool refunded)",
+    'function confirmReceived() external',
+    'function finalize() external',
+    'function openDispute() external',
+    'function refundBuyer() external',
+    'function penalizeWinner() external',
+    'function withdrawDeposit() external',
+    'function getAllBids() view returns (address[] memory, uint[] memory, uint[] memory)',
+    'function seller() view returns (address)',
+    'function highestBidder() view returns (address)',
+    'function highestBid() view returns (uint)',
+    'function actionEndTime() view returns (uint)',
+    'function ended() view returns (bool)',
   ];
 
-  constructor(private readonly prisma: PrismaService) {
-    this.provider = new ethers.providers.JsonRpcProvider('http://127.0.0.1:8545');
+  constructor(private prisma: PrismaService) {
+    this.provider = new ethers.providers.JsonRpcProvider('http://127.0.0.1:8545', {
+      name: 'hardhat',
+      chainId: 31337,
+    });
+
+    // ví admin để deploy
     this.wallet = new ethers.Wallet(
       '0x8b3a350cf5c34c9194ca85829a2df0ec3153be0318b5e2d3348e872092edffba',
-      this.provider
+      this.provider,
     );
+
     this.factory = new ethers.Contract(this.factoryAddress, this.factoryABI, this.wallet);
   }
+  private async refundLosers(auction: ethers.Contract, contractAddress: string) {
+    try {
+      const [bidders, amounts, deposits] = await auction.getAllBids();
+      const highestBidder = await auction.highestBidder();
 
+      for (let i = 0; i < bidders.length; i++) {
+        const bidder = bidders[i];
+        const deposit = parseFloat(ethers.utils.formatEther(deposits[i]));
+
+        // ❌ Người thua
+        if (bidder.toLowerCase() !== highestBidder.toLowerCase()) {
+          try {
+            const tx = await auction.connect(this.wallet).refundBuyer({
+              from: bidder,
+              value: 0,
+            });
+            await tx.wait();
+            this.logger.log(`💸 Refunded loser ${bidder} (${deposit} ETH)`);
+          } catch (err) {
+            this.logger.warn(`⚠️ Refund failed for ${bidder}: ${err.message}`);
+          }
+        }
+      }
+
+      this.logger.log(`✅ All losers refunded for auction: ${contractAddress}`);
+    } catch (e) {
+      this.logger.error(`❌ refundLosers() error for ${contractAddress}: ${e.message}`);
+    }
+  }
+
+  // 🕒 Tự động finalize các auction hết hạn
+  @Cron(CronExpression.EVERY_MINUTE)
+  async autoFinalizeAuctions() {
+    const now = new Date();
+
+    const auctions = await this.prisma.auction.findMany({
+      where: { status: 'Active', endTime: { lte: now } },
+    });
+
+    for (const a of auctions) {
+      try {
+        const auction = new ethers.Contract(a.contractAddress, this.auctionABI, this.wallet);
+        const ended = await auction.ended();
+        if (ended) continue;
+
+        // ✅ Gọi finalize trên blockchain
+        const tx = await auction.finalize();
+        await tx.wait();
+
+        // ✅ Cập nhật DB
+        await this.prisma.auction.update({
+          where: { id: a.id },
+          data: { status: 'Ended' },
+        });
+
+        this.logger.log(`✅ Finalized auction: ${a.contractAddress}`);
+
+        // ✅ Gọi refund losers sau khi finalize
+        await this.refundLosers(auction, a.contractAddress);
+
+      } catch (e) {
+        this.logger.error(`❌ Error finalizing ${a.contractAddress}: ${e.message}`);
+      }
+    }
+  }
+  // 🕒 Tự động phạt người thắng nếu không thanh toán
+  @Cron(CronExpression.EVERY_MINUTE)
+  async autoPenalizeWinners() {
+    const now = Math.floor(Date.now() / 1000);
+
+    const auctions = await this.prisma.auction.findMany({
+      where: { status: 'Ended' }, // chỉ kiểm tra đấu giá đã kết thúc
+    });
+
+    for (const a of auctions) {
+      try {
+        const auction = new ethers.Contract(a.contractAddress, this.auctionABI, this.wallet);
+
+        const ended = await auction.ended();
+        const highestBidder = await auction.highestBidder();
+        const highestBid = await auction.highestBid();
+        const endTime = await auction.actionEndTime();
+        const isPaid = await auction.isPaidToSeller?.().catch(() => false);
+
+        // ⛔ Nếu chưa thanh toán & đã quá hạn 1 phút
+        if (ended && !isPaid && now > endTime.toNumber() + 60) {
+          const tx = await auction.penalizeWinner();
+          await tx.wait();
+
+          this.logger.warn(`⚠️ Winner penalized for auction: ${a.contractAddress}`);
+
+          // Cập nhật DB → đấu giá bị hủy, item trả về seller
+          await this.prisma.auction.update({
+            where: { id: a.id },
+            data: { status: 'Penalized' },
+          });
+        }
+      } catch (e) {
+        this.logger.error(`❌ autoPenalizeWinners error: ${e.message}`);
+      }
+    }
+  }
+  // ======================================
+  // 🟢 Lấy danh sách đấu giá
+  // ======================================
+  async getAllAuctions() {
+    return this.prisma.auction.findMany({
+      include: { item: true, seller: { select: { id: true, email: true } } },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  // ======================================
+  // 🟢 Chi tiết 1 đấu giá
+  // ======================================
+  async getAuctionDetail(address: string) {
+    const auction = new ethers.Contract(address, this.auctionABI, this.provider);
+
+    const [seller, highestBidder, highestBid, endTime, ended] = await Promise.all([
+      auction.seller(),
+      auction.highestBidder(),
+      auction.highestBid(),
+      auction.actionEndTime(),
+      auction.ended(),
+    ]);
+
+    return {
+      contractAddress: address,
+      seller,
+      highestBidder,
+      highestBid: ethers.utils.formatEther(highestBid),
+      endTime: new Date(endTime.toNumber() * 1000).toISOString(),
+      ended,
+    };
+  }
+
+  // ======================================
   // 🟢 Tạo đấu giá mới
+  // ======================================
   async createAuction(data: any, userId: number) {
-    const tx = await this.factory.createAction(data.duration);
+    const seller = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!seller) throw new NotFoundException('Seller not found');
+
+    // 🔑 Gọi hàm factory để deploy Action contract mới
+    const tx = await this.factory.createAction(data.duration, seller.wallet);
     const receipt = await tx.wait();
 
     let newAuctionAddress: string | null = null;
     for (const ev of receipt.events || []) {
       if (ev.event === 'ActionCreated') {
-        newAuctionAddress = ev.args?.actionAddress || ev.args?.[1];
+        newAuctionAddress = ev.args?.actionAddress;
         break;
       }
     }
 
     if (!newAuctionAddress) throw new Error('Không tìm thấy địa chỉ đấu giá mới!');
 
-    const item = await this.prisma.item.create({
-      data: {
-        name: data.name,
-        description: data.description,
-        imageUrl: data.imageUrl,
-        startingPrice: data.startingPrice,
-        reservePrice: data.reservePrice,
-        ownerId: userId,
-        status: 'pending',
-      },
-    });
-
+    // 🕒 Thời gian bắt đầu - kết thúc
     const startTime = new Date();
     const endTime = new Date(startTime.getTime() + data.duration * 1000);
 
+    // 🧩 Lưu vào DB
     const auction = await this.prisma.auction.create({
       data: {
-        itemId: item.id,
-        sellerId: userId,
+        item: {
+          create: {
+            name: data.name,
+            description: data.description,
+            imageUrl: data.imageUrl,
+            startingPrice: data.startingPrice,
+            reservePrice: data.reservePrice,
+            ownerId: userId,
+            status: 'pending',
+          },
+        },
+        seller: { connect: { id: userId } },
         contractAddress: newAuctionAddress,
         startTime,
         endTime,
         status: 'Active',
       },
-      include: { item: true },
+      include: { item: true, seller: true },
     });
 
     return auction;
   }
 
-  // 🟢 Lấy danh sách tất cả đấu giá từ DB
-  async getAllAuctions() {
-    const auctions = await this.prisma.auction.findMany({
-      include: {
-        item: true,
-        seller: { select: { id: true, email: true } },
-      },
-      orderBy: { createdAt: 'desc' },
+  // ======================================
+  // 🟢 Đặt giá (có cọc)
+  // ======================================
+  async placeBid(address: string, amount: number, userId: number) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user || !user.privatekey) throw new NotFoundException('User wallet not found');
+
+    const privateKey = this.decryptPrivateKey(user.privatekey);
+    const signer = new ethers.Wallet(privateKey, this.provider);
+    const auction = new ethers.Contract(address, this.auctionABI, signer);
+
+    // 🔍 Lấy dữ liệu bid cũ (nếu có)
+    const bidInfo = await auction.bids(user.wallet);
+    const currentDeposit = parseFloat(ethers.utils.formatEther(bidInfo.deposit));
+
+    // 🧮 Tính cọc cần cho giá mới
+    const requiredDeposit = amount * 0.1;
+    const additionalDeposit = Math.max(requiredDeposit - currentDeposit, 0);
+
+    // 🪙 Gửi phần cọc chênh lệch (nếu có)
+    const tx = await auction.placeBid(ethers.utils.parseEther(amount.toString()), {
+      value: ethers.utils.parseEther(additionalDeposit.toString()),
     });
-    console.log('Auctions from DB:', auctions);
-    return auctions;
-  }
 
-  // 🟢 Chi tiết 1 phiên đấu giá
-  async getAuctionDetail(contractAddress: string) {
-    const auction = new ethers.Contract(contractAddress, this.auctionABI, this.wallet);
-
-    const [highestBid, highestBidder, seller, endTime, ended] = await Promise.all([
-      auction.highestBid(),
-      auction.highestBidder(),
-      auction.seller(),
-      auction.actionEndTime(),
-      auction.ended(),
-    ]);
+    await tx.wait();
 
     return {
-      contractAddress,
-      seller,
-      highestBid: ethers.utils.formatEther(highestBid),
-      highestBidder,
-      endTime: new Date(Number(endTime) * 1000).toLocaleString('vi-VN'),
-      ended,
+      txHash: tx.hash,
+      totalBid: amount,
+      additionalDeposit,
+      message: `✅ Placed bid successfully. Sent only ${additionalDeposit} ETH extra deposit.`,
     };
   }
 
-  async placeBid(contractAddress: string, amount: number, userId: number) {
-    // 1. Lấy wallet của bidder
-    const bidder = await this.prisma.user.findUnique({ where: { id: userId } })
-    if (!bidder || !bidder.wallet)
-      throw new NotFoundException('Wallet address not found for bidder')
+  // ======================================
+  // 🟢 Thanh toán phần còn lại
+  // ======================================
+  async payWinningBid(address: string, userId: number) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user || !user.privatekey) throw new NotFoundException('User wallet not found');
 
-    // 2. Tạo contract instance và gửi transaction blockchain
-    const auctionContract = new ethers.Contract(contractAddress, this.auctionABI, this.wallet)
-    const tx = await auctionContract.bid({ value: ethers.utils.parseEther(amount.toString()) })
-    await tx.wait()
+    const privateKey = this.decryptPrivateKey(user.privatekey);
+    const signer = new ethers.Wallet(privateKey, this.provider);
+    const auction = new ethers.Contract(address, this.auctionABI, signer);
 
-    // 3. Lưu transaction vào DB
-    const transaction = await this.prisma.transaction.create({
-      data: {
-        txHash: tx.hash,
-        fromAddress: bidder.wallet,
-        toAddress: contractAddress,
-        amount,
-        auction: { connect: { contractAddress } }, // kết nối với Auction theo contractAddress
-      },
-    })
+    // 🔍 Lấy thông tin từ contract
+    const [highestBid, bidInfo] = await Promise.all([
+      auction.highestBid(),
+      auction.bids(user.wallet),
+    ]);
 
-    return transaction
+    const deposit = parseFloat(ethers.utils.formatEther(bidInfo.deposit));
+    const totalBid = parseFloat(ethers.utils.formatEther(highestBid));
+    const remaining = totalBid - deposit;
+
+    if (remaining <= 0) throw new BadRequestException('Nothing left to pay');
+
+    // 💸 Gửi phần còn lại
+    const tx = await auction.payWinningBid({
+      value: ethers.utils.parseEther(remaining.toString()),
+    });
+
+    await tx.wait();
+
+    return {
+      txHash: tx.hash,
+      totalBid,
+      deposit,
+      remaining,
+      message: `✅ Paid remaining ${remaining} ETH successfully`,
+    };
+  }
+  // ======================================
+  // 🟢 Buyer xác nhận nhận hàng
+  // ======================================
+  async confirmReceived(address: string, userId: number) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user || !user.privatekey) throw new NotFoundException('User wallet not found');
+
+    const privateKey = this.decryptPrivateKey(user.privatekey);
+    const signer = new ethers.Wallet(privateKey, this.provider);
+    const auction = new ethers.Contract(address, this.auctionABI, signer);
+
+    const tx = await auction.confirmReceived();
+    await tx.wait();
+
+    return { txHash: tx.hash, message: 'Buyer confirmed received item' };
   }
 
-  // 🟢 Lấy danh sách tất cả các bid từ contract
-  async getAllBids(contractAddress: string) {
-    const auction = new ethers.Contract(contractAddress, this.auctionABI, this.wallet);
-    const [addresses, amounts] = await auction.getAllBids();
+  // ======================================
+  // 🟢 Mở tranh chấp
+  // ======================================
+  async openDispute(address: string, userId: number) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user || !user.privatekey) throw new NotFoundException('User wallet not found');
 
-    // Chuyển BigNumber thành ETH rồi sắp xếp giảm dần
-    const result = addresses.map((addr: string, i: number) => ({
+    const privateKey = this.decryptPrivateKey(user.privatekey);
+    const signer = new ethers.Wallet(privateKey, this.provider);
+    const auction = new ethers.Contract(address, this.auctionABI, signer);
+
+    const tx = await auction.openDispute();
+    await tx.wait();
+
+    return { txHash: tx.hash, message: 'Dispute opened successfully' };
+  }
+
+  // ======================================
+  // 🟢 Seller hoàn tiền cho buyer
+  // ======================================
+  async refundBuyer(address: string, userId: number) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user || !user.privatekey) throw new NotFoundException('User wallet not found');
+
+    const privateKey = this.decryptPrivateKey(user.privatekey);
+    const signer = new ethers.Wallet(privateKey, this.provider);
+    const auction = new ethers.Contract(address, this.auctionABI, signer);
+
+    const tx = await auction.refundBuyer();
+    await tx.wait();
+
+    return { txHash: tx.hash, message: 'Buyer refunded' };
+  }
+
+  // ======================================
+  // 🟢 Phạt người thắng không thanh toán
+  // ======================================
+  async penalizeWinner(address: string) {
+    const auction = new ethers.Contract(address, this.auctionABI, this.wallet);
+    const tx = await auction.penalizeWinner();
+    await tx.wait();
+    return { txHash: tx.hash, message: 'Winner penalized' };
+  }
+
+  // ======================================
+  // 🟢 Người thua rút lại cọc
+  // ======================================
+  async withdrawDeposit(address: string, userId: number) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user || !user.privatekey) throw new NotFoundException('User wallet not found');
+
+    const privateKey = this.decryptPrivateKey(user.privatekey);
+    const signer = new ethers.Wallet(privateKey, this.provider);
+    const auction = new ethers.Contract(address, this.auctionABI, signer);
+
+    const tx = await auction.withdrawDeposit();
+    await tx.wait();
+
+    return { txHash: tx.hash, message: 'Deposit withdrawn successfully' };
+  }
+
+  // ======================================
+  // 🟢 Lấy danh sách bids
+  // ======================================
+  async getAllBids(address: string) {
+    const auction = new ethers.Contract(address, this.auctionABI, this.provider);
+    const [bidders, amounts, deposits] = await auction.getAllBids();
+
+    return bidders.map((addr: string, i: number) => ({
       bidder: addr,
-      amount: parseFloat(ethers.utils.formatEther(amounts[i])),
+      amount: ethers.utils.formatEther(amounts[i]),
+      deposit: ethers.utils.formatEther(deposits[i]),
     }));
-
-    // 🔽 Sắp xếp giảm dần theo số tiền
-    result.sort((a, b) => b.amount - a.amount);
-
-    return result;
   }
 
-  
+  // ======================================
+  // 🔐 Giải mã private key
+  // ======================================
+  private decryptPrivateKey(encrypted: string): string {
+    const ENCRYPTION_KEY = process.env.PRIVATE_KEY_ENCRYPTION_KEY!;
+    const IV_LENGTH = 16;
+    const [ivHex, encryptedText] = encrypted.split(':');
+    const iv = Buffer.from(ivHex, 'hex');
+    const decipher = crypto.createDecipheriv(
+      'aes-256-cbc',
+      Buffer.from(ENCRYPTION_KEY, 'hex'),
+      iv,
+    );
+    let decrypted = decipher.update(encryptedText, 'hex', 'utf8');
+    decrypted += decipher.final('utf8');
+    return decrypted;
+  }
 }

@@ -62,7 +62,7 @@ const handleLogin = async () => {
     if (token) {
       localStorage.setItem('jwt', token) // ✅ dùng cùng key với chỗ gọi API
       alert('Đăng nhập thành công!')
-      router.push('/auction/index') // ✅ Redirect sang danh sách đấu giá
+      router.push('/User') // ✅ Redirect sang danh sách đấu giá
     } else {
       alert('Không nhận được token từ server')
     }
