@@ -72,9 +72,6 @@ watch(auctions, (val) => {
 })
 const formatPrice = (price) => {
   if (!price) return '—'
-  return new Intl.NumberFormat('vi-VN', {
-    style: 'currency',
-    currency: 'VND',
-  }).format(price)
+  return `${Number(price).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ETH`
 }
 </script>
