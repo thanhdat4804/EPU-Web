@@ -1,84 +1,80 @@
 <template>
-  <div>
-    <h1 class="text-xl font-semibold mb-4">Quản lý phiên đấu giá</h1>
+  <div class="min-h-screen bg-gray-50">
+    <Header />
 
-    <div class="flex items-center justify-between mb-4">
-      <input
-        v-model="search"
-        type="text"
-        placeholder="Tìm kiếm theo vật phẩm hoặc ID..."
-        class="border rounded px-3 py-2 w-1/3"
-      />
-      <select v-model="filter" class="border rounded px-3 py-2">
-        <option value="">Tất cả</option>
-        <option value="active">Đang diễn ra</option>
-        <option value="upcoming">Sắp bắt đầu</option>
-        <option value="ended">Đã kết thúc</option>
-      </select>
-    </div>
+    <!-- Thanh thể loại -->
+    <CategoryMenu
+      :categories="categories"
+      :selected="selectedCategory"
+      @select="selectCategory"
+    />
 
-    <table class="min-w-full bg-white rounded shadow-sm">
-      <thead>
-        <tr class="border-b bg-gray-50 text-left">
-          <th class="p-3">ID</th>
-          <th class="p-3">Vật phẩm</th>
-          <th class="p-3">Giá hiện tại</th>
-          <th class="p-3">Người đặt cao nhất</th>
-          <th class="p-3">Thời gian còn lại</th>
-          <th class="p-3">Trạng thái</th>
-          <th class="p-3 text-right">Hành động</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr
-          v-for="auction in filteredAuctions"
-          :key="auction.id"
-          class="border-b hover:bg-gray-50 transition"
-        >
-          <td class="p-3">{{ auction.id }}</td>
-          <td class="p-3">{{ auction.item }}</td>
-          <td class="p-3">€{{ auction.currentBid }}</td>
-          <td class="p-3">{{ auction.highestBidder }}</td>
-          <td class="p-3">{{ auction.remaining }}</td>
-          <td class="p-3">
+    <div v-if="loading" class="p-6 text-center text-gray-500">Đang tải dữ liệu...</div>
+    <div v-else-if="error" class="p-6 text-center text-red-500">{{ error }}</div>
+
+    <!-- Danh sách đấu giá -->
+    <div v-else class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-6 p-6">
+      <NuxtLink
+        v-for="auction in auctions"
+        :key="auction.contractAddress"
+        :to="`/auction/${auction.contractAddress}`"
+        class="bg-white rounded-xl shadow hover:shadow-lg hover:-translate-y-1 transition block overflow-hidden"
+      >
+        <div class="aspect-square bg-gray-100 flex items-center justify-center">
+          <img
+            :src="auction.item?.imageUrl || '/no-image.jpg'"
+            :alt="auction.item?.name"
+            class="object-contain w-full h-full"
+          />
+        </div>
+        <div class="p-4">
+          <h3 class="font-semibold text-gray-800 truncate">{{ auction.item?.name }}</h3>
+          <p class="text-sm text-gray-500 mt-1 truncate">
+            {{ auction.item?.description || 'Không có mô tả' }}
+          </p>
+          <div class="mt-3 flex justify-between items-center">
+            <span class="text-blue-600 font-bold">
+              {{ formatPrice(auction.item?.startingPrice || 0) }}
+            </span>
             <span
+              class="text-xs font-semibold px-2 py-1 rounded-lg"
               :class="{
-                'text-green-600': auction.status === 'active',
-                'text-gray-500': auction.status === 'ended',
-                'text-blue-600': auction.status === 'upcoming'
+                'bg-green-100 text-green-700': auction.status === 'Active',
+                'bg-gray-200 text-gray-600': auction.status === 'Ended'
               }"
             >
               {{ auction.status }}
             </span>
-          </td>
-          <td class="p-3 text-right">
-            <button class="text-blue-600 hover:underline mr-2">Chi tiết</button>
-            <button v-if="auction.status==='active'" class="text-red-600 hover:underline">Kết thúc</button>
-          </td>
-        </tr>
-      </tbody>
-    </table>
+          </div>
+        </div>
+        
+      </NuxtLink>
+    </div>
   </div>
 </template>
 
 <script setup>
-definePageMeta({
-  layout: 'admin'
+import Header from '~/components/User/Header.vue'
+import CategoryMenu from '~/components/User/CategoryMenu.vue'
+import { useAuctions } from '~/composables/User/useAuctions'
+import ProductCard from '~/components/User/ProductCard.vue'
+
+const {
+  auctions,
+  categories,
+  selectedCategory,
+  selectCategory,
+  loading,
+  error,
+} = useAuctions()
+watch(auctions, (val) => {
+  console.log('🧩 Auctions data:', JSON.parse(JSON.stringify(val)))
 })
-
-const search = ref('')
-const filter = ref('')
-
-const auctions = ref([
-  { id: 1, item: 'Đồng hồ Omega 1965', currentBid: 2200, highestBidder: 'buyerA', remaining: '2h 30m', status: 'active' },
-  { id: 2, item: 'Tranh phong cảnh cổ', currentBid: 850, highestBidder: 'buyerB', remaining: 'Đã kết thúc', status: 'ended' },
-  { id: 3, item: 'Xe Vespa cổ 1978', currentBid: 0, highestBidder: '-', remaining: 'Bắt đầu sau 1h', status: 'upcoming' }
-])
-
-const filteredAuctions = computed(() =>
-  auctions.value.filter(a =>
-    a.item.toLowerCase().includes(search.value.toLowerCase()) &&
-    (filter.value === '' || a.status === filter.value)
-  )
-)
+const formatPrice = (price) => {
+  if (!price) return '—'
+  return new Intl.NumberFormat('vi-VN', {
+    style: 'currency',
+    currency: 'VND',
+  }).format(price)
+}
 </script>
