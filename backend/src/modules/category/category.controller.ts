@@ -16,4 +16,10 @@ export class CategoryController {
   async getDetail(@Param('id', ParseIntPipe) id: number) {
     return this.categoryService.getCategoryDetail(id);
   }
+
+   // 🟢 Lấy tất cả auctions theo category
+  @Get(':id/auctions')
+  async getAuctionsByCategory(@Param('id', ParseIntPipe) id: number) {
+    return this.categoryService.getAuctionsByCategory(id);
+  }
 }
