@@ -240,7 +240,7 @@ const handleLogin = async () => {
       if (user?.role === "admin") {
         router.push("/admin");
       } else {
-        router.push("/User");
+        router.push("/auction/");
       }
     } else {
       throw new Error("Không nhận được token từ server");
