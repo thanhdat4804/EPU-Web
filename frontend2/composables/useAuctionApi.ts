@@ -20,7 +20,7 @@ export function useAuctionApi() {
 
   // 🟢 Tạo đấu giá mới
   const createAuction = async (auctionData: any): Promise<any> => {
-    const token = localStorage.getItem('token')
+    const token = localStorage.getItem('jwt')
     if (!token) throw new Error('User not logged in')
 
     return await $fetch(`${API_BASE}/create`, {
@@ -32,7 +32,7 @@ export function useAuctionApi() {
 
   // 🟢 Đặt giá (gửi deposit)
   const placeBid = async (address: string, amount: number, deposit: number): Promise<any> => {
-    const token = localStorage.getItem('token')
+    const token = localStorage.getItem('jwt')
     if (!token) throw new Error('User not logged in')
 
     return await $fetch(`${API_BASE}/${address}/bid`, {
@@ -44,7 +44,7 @@ export function useAuctionApi() {
 
   // 🟢 Thanh toán phần còn lại (winner)
   const payWinningBid = async (address: string, amount: number): Promise<any> => {
-    const token = localStorage.getItem('token')
+    const token = localStorage.getItem('jwt')
     if (!token) throw new Error('User not logged in')
 
     return await $fetch(`${API_BASE}/${address}/pay`, {
@@ -56,7 +56,7 @@ export function useAuctionApi() {
 
   // 🟢 Xác nhận đã nhận hàng
   const confirmReceived = async (address: string): Promise<any> => {
-    const token = localStorage.getItem('token')
+    const token = localStorage.getItem('jwt')
     if (!token) throw new Error('User not logged in')
 
     return await $fetch(`${API_BASE}/${address}/confirm`, {
@@ -67,7 +67,7 @@ export function useAuctionApi() {
 
   // 🟢 Mở tranh chấp
   const openDispute = async (address: string): Promise<any> => {
-    const token = localStorage.getItem('token')
+    const token = localStorage.getItem('jwt')
     if (!token) throw new Error('User not logged in')
 
     return await $fetch(`${API_BASE}/${address}/dispute`, {
@@ -78,7 +78,7 @@ export function useAuctionApi() {
 
   // 🟢 Seller hoàn tiền cho buyer khi tranh chấp thắng
   const refundBuyer = async (address: string): Promise<any> => {
-    const token = localStorage.getItem('token')
+    const token = localStorage.getItem('jwt')
     if (!token) throw new Error('User not logged in')
 
     return await $fetch(`${API_BASE}/${address}/refund`, {
@@ -89,7 +89,7 @@ export function useAuctionApi() {
 
   // 🟢 Người thua rút tiền cọc
   const withdrawDeposit = async (address: string): Promise<any> => {
-    const token = localStorage.getItem('token')
+    const token = localStorage.getItem('jwt')
     if (!token) throw new Error('User not logged in')
 
     return await $fetch(`${API_BASE}/${address}/withdraw`, {
@@ -100,7 +100,7 @@ export function useAuctionApi() {
 
   // 🟢 Phạt người thắng nếu không thanh toán sau 24h
   const penalizeWinner = async (address: string): Promise<any> => {
-    const token = localStorage.getItem('token')
+    const token = localStorage.getItem('jwt')
     if (!token) throw new Error('User not logged in')
 
     return await $fetch(`${API_BASE}/${address}/penalize`, {
