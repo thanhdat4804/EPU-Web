@@ -97,30 +97,15 @@
           ]"
         >
           <div class="ml-8 space-y-1">
-            <NuxtLink
-              to="/admin/users"
-              :class="getSubItemClass('/admin/users')"
-            >
-              Danh sách
-            </NuxtLink>
-            <NuxtLink
-              to="/admin/sellers"
-              :class="getSubItemClass('/admin/sellers')"
-            >
-              Người bán
-            </NuxtLink>
+           
             <NuxtLink
               to="/admin/experts"
               :class="getSubItemClass('/admin/experts')"
             >
               Chuyên gia
             </NuxtLink>
-            <NuxtLink
-              to="/admin/users/create"
-              :class="getSubItemClass('/admin/users/create')"
-            >
-              Thêm người dùng
-            </NuxtLink>
+
+           
           </div>
         </div>
       </div>

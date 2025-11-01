@@ -173,56 +173,7 @@
         </div>
 
         <!-- Payment Settings -->
-        <div v-if="activeTab === 'payment'" class="space-y-6">
-          <div>
-            <h3 class="text-lg font-semibold text-gray-900 mb-4">Phương thức thanh toán</h3>
-            <div class="space-y-3">
-              <div class="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-                <div class="flex items-center gap-3">
-                  <input type="checkbox" v-model="settings.payment.creditCard.enabled" class="w-4 h-4 text-blue-600" />
-                  <div>
-                    <div class="font-medium text-gray-900">Thẻ tín dụng</div>
-                    <div class="text-sm text-gray-500">Visa, Mastercard, American Express</div>
-                  </div>
-                </div>
-                <button class="text-sm text-blue-600 hover:text-blue-700">Cấu hình</button>
-              </div>
-
-              <div class="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-                <div class="flex items-center gap-3">
-                  <input type="checkbox" v-model="settings.payment.paypal.enabled" class="w-4 h-4 text-blue-600" />
-                  <div>
-                    <div class="font-medium text-gray-900">PayPal</div>
-                    <div class="text-sm text-gray-500">Thanh toán qua PayPal</div>
-                  </div>
-                </div>
-                <button class="text-sm text-blue-600 hover:text-blue-700">Cấu hình</button>
-              </div>
-
-              <div class="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-                <div class="flex items-center gap-3">
-                  <input type="checkbox" v-model="settings.payment.bankTransfer.enabled" class="w-4 h-4 text-blue-600" />
-                  <div>
-                    <div class="font-medium text-gray-900">Chuyển khoản ngân hàng</div>
-                    <div class="text-sm text-gray-500">Chuyển khoản trực tiếp</div>
-                  </div>
-                </div>
-                <button class="text-sm text-blue-600 hover:text-blue-700">Cấu hình</button>
-              </div>
-
-              <div class="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-                <div class="flex items-center gap-3">
-                  <input type="checkbox" v-model="settings.payment.crypto.enabled" class="w-4 h-4 text-blue-600" />
-                  <div>
-                    <div class="font-medium text-gray-900">Tiền mã hóa</div>
-                    <div class="text-sm text-gray-500">Bitcoin, Ethereum, USDT</div>
-                  </div>
-                </div>
-                <button class="text-sm text-blue-600 hover:text-blue-700">Cấu hình</button>
-              </div>
-            </div>
-          </div>
-        </div>
+        
 
         <!-- Email Settings -->
         <div v-if="activeTab === 'email'" class="space-y-6">
@@ -374,7 +325,6 @@ const activeTab = ref('general')
 const tabs = [
   { id: 'general', label: 'Chung' },
   { id: 'auction', label: 'Đấu giá' },
-  { id: 'payment', label: 'Thanh toán' },
   { id: 'email', label: 'Email' },
   { id: 'security', label: 'Bảo mật' }
 ]
