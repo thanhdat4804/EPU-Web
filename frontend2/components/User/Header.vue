@@ -2,7 +2,7 @@
   <header class="bg-white shadow-sm sticky top-0 z-50">
     <div class="flex items-center justify-between px-8 py-4 relative">
       <!-- Logo -->
-      <NuxtLink to="/User" class="text-2xl font-bold text-blue-600 select-none">
+      <NuxtLink to="/auction" class="text-2xl font-bold text-blue-600 select-none">
         BidDora
       </NuxtLink>
 
