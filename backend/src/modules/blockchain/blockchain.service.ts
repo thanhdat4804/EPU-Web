@@ -162,9 +162,10 @@ export class BlockchainService {
   }
 
   // ======================================
-  // 🟢 Chi tiết 1 đấu giá
+// 🟢 Chi tiết 1 đấu giá (gồm cả item trong DB)
   // ======================================
   async getAuctionDetail(address: string) {
+    // 1️⃣ Lấy dữ liệu blockchain
     const auction = new ethers.Contract(address, this.auctionABI, this.provider);
 
     const [seller, highestBidder, highestBid, endTime, ended] = await Promise.all([
@@ -175,16 +176,32 @@ export class BlockchainService {
       auction.ended(),
     ]);
 
+    // 2️⃣ Lấy dữ liệu từ database (Prisma)
+    const auctionDb = await this.prisma.auction.findUnique({
+      where: { contractAddress: address },
+      include: {
+        item: true, // ✅ lấy luôn thông tin item
+        seller: {
+          select: { id: true, name: true, email: true },
+        },
+      },
+    });
+
+    if (!auctionDb) throw new NotFoundException('Không tìm thấy đấu giá trong database');
+
+    // 3️⃣ Kết hợp dữ liệu cả hai nguồn
     return {
       contractAddress: address,
-      seller,
+      seller: auctionDb.seller,         // thông tin người bán từ DB
       highestBidder,
       highestBid: ethers.utils.formatEther(highestBid),
       endTime: new Date(endTime.toNumber() * 1000).toISOString(),
       ended,
+      status: auctionDb.status,
+      createdAt: auctionDb.createdAt,
+      item: auctionDb.item,             // ✅ Thêm thông tin item
     };
   }
-
   // ======================================
   // 🟢 Tạo đấu giá mới
   // ======================================
