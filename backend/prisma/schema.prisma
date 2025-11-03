@@ -19,6 +19,8 @@ model User {
   auctions             Auction[] @relation("SellerAuctions")
   bids                 Bid[]
   createdAt            DateTime  @default(now())
+  resetToken           String?      // Mã reset mật khẩu ngẫu nhiên
+  resetTokenExpire     DateTime?    // Thời điểm hết hạn mã (VD: 15 phút)
 }
 
 model Category {
