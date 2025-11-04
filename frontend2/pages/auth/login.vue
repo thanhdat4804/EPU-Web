@@ -237,7 +237,7 @@ const handleLogin = async () => {
 
       // Redirect based on user role
       const user = res?.user;
-      if (user?.role === "admin") {
+      if (user?.role === "Admin") {
         router.push("/admin");
       } else {
         router.push("/auction/");

@@ -97,6 +97,7 @@ model Bid {
   auctionId  Int
   amount     Float
   createdAt  DateTime  @default(now())
+  status String? // "win" | "lose"
 }
 
 model Transaction {

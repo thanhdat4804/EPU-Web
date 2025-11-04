@@ -42,13 +42,65 @@ export class UserService {
         wallet: true,
         role: true,
         createdAt: true,
-        items: { select: { id: true, name: true, status: true, createdAt: true } },
-        auctions: { select: { id: true, contractAddress: true, status: true, createdAt: true } },
+
+        // 🟢 Vật phẩm mà user sở hữu (người bán)
+        items: {
+          select: {
+            id: true,
+            name: true,
+            status: true,
+            createdAt: true,
+          },
+        },
+
+        // 🟢 Các cuộc đấu giá do user tạo (người bán)
+        auctions: {
+          select: {
+            id: true,
+            contractAddress: true,
+            status: true,
+            createdAt: true,
+            item: {   // Thêm item liên kết với auction
+              select: {
+                id: true,
+                name: true,
+                startingPrice: true,
+              },
+            },
+          },
+        },
+
+        // 🟢 Các phiên đấu giá user đã tham gia (người mua)
+        bids: {
+          select: {
+            id: true,
+            amount: true,
+            status: true,
+            createdAt: true,
+            auction: { // Nối sang bảng auction
+              select: {
+                id: true,
+                contractAddress: true,
+                status: true,
+                item: { // Và nối tiếp sang bảng item
+                  select: {
+                    id: true,
+                    name: true,
+                    startingPrice: true,
+                  },
+                },
+              },
+            },
+          },
+        },
       },
     });
+
     if (!user) throw new NotFoundException('Không tìm thấy người dùng');
+
     return user;
   }
+
 
   // 🗑️ Xóa user
   async deleteUser(id: number) {

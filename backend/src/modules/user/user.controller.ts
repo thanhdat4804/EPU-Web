@@ -22,8 +22,7 @@ export class UserController {
   }
   // 🟢 Xem chi tiết user
   @Get(':id')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('Admin')
+  
   async getUserById(@Param('id', ParseIntPipe) id: number) {
     return this.userService.getUserById(id);
   }

@@ -255,21 +255,23 @@ export class BlockchainService {
   }
 
   // ======================================
-  // 🟢 Đặt giá (có cọc)
+  // 🟢 Đặt giá (có cọc) + Lưu DB Bid (update nếu đã tồn tại)
   // ======================================
   async placeBid(address: string, amount: number, userId: number) {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
-    if (!user || !user.privatekey) throw new NotFoundException('User wallet not found');
+    if (!user || !user.privatekey)
+      throw new NotFoundException('User wallet not found');
 
+    // ✅ Giải mã private key và khởi tạo signer
     const privateKey = this.decryptPrivateKey(user.privatekey);
     const signer = new ethers.Wallet(privateKey, this.provider);
     const auction = new ethers.Contract(address, this.auctionABI, signer);
 
-    // 🔍 Lấy dữ liệu bid cũ (nếu có)
+    // 🔍 Lấy dữ liệu bid cũ (on-chain)
     const bidInfo = await auction.bids(user.wallet);
     const currentDeposit = parseFloat(ethers.utils.formatEther(bidInfo.deposit));
 
-    // 🧮 Tính cọc cần cho giá mới
+    // 🧮 Tính toán phần cọc cần thêm
     const requiredDeposit = amount * 0.1;
     const additionalDeposit = Math.max(requiredDeposit - currentDeposit, 0);
 
@@ -280,14 +282,49 @@ export class BlockchainService {
 
     await tx.wait();
 
+    // 🔹 Tìm auction trong DB
+    const auctionRecord = await this.prisma.auction.findUnique({
+      where: { contractAddress: address },
+    });
+    if (!auctionRecord)
+      throw new NotFoundException('Auction not found in database');
+
+    // 🔹 Kiểm tra xem user đã từng bid trong auction này chưa
+    const existingBid = await this.prisma.bid.findFirst({
+      where: {
+        bidderId: userId,
+        auctionId: auctionRecord.id,
+      },
+    });
+
+    if (existingBid) {
+      // ✅ Nếu đã có -> update số tiền mới
+      await this.prisma.bid.update({
+        where: { id: existingBid.id },
+        data: {
+          amount, // giá mới
+        },
+      });
+    } else {
+      // ✅ Nếu chưa -> tạo mới
+      await this.prisma.bid.create({
+        data: {
+          amount,
+          bidder: { connect: { id: userId } },
+          auction: { connect: { id: auctionRecord.id } },
+        },
+      });
+    }
+
     return {
       txHash: tx.hash,
       totalBid: amount,
       additionalDeposit,
-      message: `✅ Placed bid successfully. Sent only ${additionalDeposit} ETH extra deposit.`,
+      message: existingBid
+        ? `✅ Updated bid to ${amount} ETH (added ${additionalDeposit} ETH deposit if needed).`
+        : `✅ Placed new bid of ${amount} ETH (deposit ${additionalDeposit} ETH).`,
     };
   }
-
   // ======================================
   // 🟢 Thanh toán phần còn lại
   // ======================================
