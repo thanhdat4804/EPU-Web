@@ -85,7 +85,7 @@
             <td class="px-6 py-4 whitespace-nowrap">
               <span class="text-sm text-gray-900">{{ lot.item?.category?.name || '—' }}</span>
             </td>
-            <td class="px-6 py-4 whitespace-nowrap">
+            <td class="px-6 py-4 font-bold whitespace-nowrap">
               <span class="text-sm text-gray-900">{{lot.item?.startingPrice}} ETH</span>
             </td>
             <td class="px-6 py-4 whitespace-nowrap">
