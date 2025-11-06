@@ -79,7 +79,7 @@
           <tbody class="bg-white divide-y divide-gray-200">
             <tr v-for="auction in user.auctions" :key="auction.id" class="hover:bg-gray-50">
               <td class="px-6 py-4 whitespace-nowrap">{{ auction.item?.name || '—' }}</td>
-              <td class="px-6 py-4 whitespace-nowrap">{{ formatPrice(auction.item?.startingPrice) }}</td>
+              <td class="px-6 py-4 font-bold whitespace-nowrap">{{auction.item?.startingPrice}} ETH</td>
               <td class="px-6 py-4 whitespace-nowrap">
                 <span
                   :class="getStatusClass(auction.status)"
@@ -88,7 +88,7 @@
                   {{ auction.status }}
                 </span>
               </td>
-              <td class="px-6 py-4 whitespace-nowrap text-gray-500 text-sm">
+              <td class="px-6 py-4 whitespace-nowrap text-500 text-sm">
                 {{ formatDate(auction.createdAt) }}
               </td>
             </tr>
@@ -108,8 +108,8 @@
           </thead>
           <tbody class="bg-white divide-y divide-gray-200">
             <tr v-for="bid in user.bids" :key="bid.id" class="hover:bg-gray-50">
-              <td class="px-6 py-4 whitespace-nowrap">{{ bid.auction?.item?.name || '—' }}</td>
-              <td class="px-6 py-4 whitespace-nowrap">{{bid.amount }} ETH</td>
+              <td class="text-sm px-6 py-4 whitespace-nowrap">{{ bid.auction?.item?.name || '—' }}</td>
+              <td class="px-6 py-4 font-bold whitespace-nowrap">{{bid.amount }} ETH</td>
               <td class="px-6 py-4 whitespace-nowrap">
                 <span class="text-gray-700">{{ bid.status || 'Chưa xác định' }}</span>
               </td>

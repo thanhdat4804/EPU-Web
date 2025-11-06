@@ -156,7 +156,14 @@ export class BlockchainService {
   // ======================================
   async getAllAuctions() {
     return this.prisma.auction.findMany({
-      include: { item: true, seller: { select: { id: true, email: true } } },
+      include: { 
+        item: {
+          include: {
+            category: true, // 🟢 lấy luôn thông tin category của item
+          },
+        }, 
+        seller: { select: { id: true, email: true } } 
+      },
       orderBy: { createdAt: 'desc' },
     });
   }
@@ -180,7 +187,11 @@ export class BlockchainService {
     const auctionDb = await this.prisma.auction.findUnique({
       where: { contractAddress: address },
       include: {
-        item: true, // ✅ lấy luôn thông tin item
+        item: {
+          include: {
+            category: true, // 🟢 lấy luôn thông tin category của item
+          },
+        },
         seller: {
           select: { id: true, name: true, email: true },
         },
