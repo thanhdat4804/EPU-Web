@@ -99,9 +99,7 @@ onMounted(async () => {
 
   try {
     const userData = await $fetch('http://localhost:3001/users/me', {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
+      headers: { Authorization: `Bearer ${token}` },
     })
     user.value = userData
     localStorage.setItem('user', JSON.stringify(userData))
@@ -112,7 +110,8 @@ onMounted(async () => {
   }
 })
 
-const handleSearch = async () => {
+// ✅ Hàm tìm kiếm có debounce (gọi API trực tiếp)
+const handleSearch = () => {
   clearTimeout(timeout)
   if (!search.value.trim()) {
     searchResults.value = []
@@ -121,12 +120,10 @@ const handleSearch = async () => {
 
   timeout = setTimeout(async () => {
     try {
-      const res = await $fetch(
-        `http://localhost:3001/items?search=${encodeURIComponent(search.value)}`
-      )
-      searchResults.value = res
+      const res = await $fetch(`http://localhost:3001/items/search/by-name?name=${encodeURIComponent(search.value)}`)
+      searchResults.value = Array.isArray(res) ? res : []
     } catch (err) {
-      console.error('Lỗi khi tìm kiếm:', err)
+      console.error('❌ Lỗi khi tìm kiếm item:', err)
       searchResults.value = []
     }
   }, 300)
@@ -135,7 +132,7 @@ const handleSearch = async () => {
 const goToItem = (id) => {
   search.value = ''
   searchResults.value = []
-  router.push(`/User/item/${id}`)
+  router.push(`/auction/contractAddress`)
 }
 
 const goToProfile = () => {
@@ -152,8 +149,8 @@ const logout = () => {
 const formatPrice = (price) => {
   if (!price) return '—'
   return `${Number(price).toLocaleString('en-US', {
-    minimumFractionDigits: 4,
-    maximumFractionDigits: 4,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   })} ETH`
 }
 </script>
