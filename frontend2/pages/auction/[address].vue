@@ -31,10 +31,10 @@
               <p>
                 <b>💰 Giá hiện tại:</b>
                 <span class="font-semibold text-green-600">
-                  {{ formatEth(auction.highestBid || auction.item?.startingPrice) }}
+                  {{ formatEth(auction.onchain?.highestBid || auction.item?.startingPrice) }}
                 </span>
               </p>
-              <p><b>🏆 Người giữ giá cao nhất:</b> {{ auction.highestBidder || 'Chưa có' }}</p>
+              <p><b>🏆 Người giữ giá cao nhất:</b> {{ auction.onchain?.highestBidder || 'Chưa có' }}</p>
               <p><b>⏳ Trạng thái:</b> {{ auction.status }}</p>
             </div>
           </div>
@@ -54,7 +54,7 @@
             </div>
 
             <p class="mt-4 text-gray-600">
-              Kết thúc vào: <b>{{ formatDate(auction.endTime) }}</b>
+              Kết thúc vào: <b>{{ formatDate(auction.onchain?.endTime) }}</b>
             </p>
 
             <div class="h-2 bg-blue-100 mt-4 rounded-full overflow-hidden">
@@ -67,7 +67,7 @@
 
           <!-- Form đặt giá -->
           <div class="bg-white p-6 rounded-2xl shadow-md border border-gray-200 text-center">
-            <h2 class="text-xl font-semibold mb-4">💰 Đặt giá</h2>
+            <h2 class="text-xl font-semibold mb-4">💰 Đặt giá bằng MetaMask</h2>
 
             <div class="flex flex-col sm:flex-row items-center gap-4 justify-center">
               <input
@@ -80,9 +80,11 @@
               />
               <button
                 @click="placeBidAction"
-                class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition"
+                :disabled="isPlacing"
+                class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition disabled:opacity-60"
               >
-                Đặt giá
+                <span v-if="!isPlacing">Đặt giá</span>
+                <span v-else>⏳ Đang gửi...</span>
               </button>
             </div>
           </div>
@@ -97,7 +99,7 @@
                 :key="i"
                 class="flex justify-between items-center border-b py-2 text-gray-700"
               >
-                <span>{{ b.fromAddress }}</span>
+                <span>{{ b.bidder }}</span>
                 <span class="font-semibold text-gray-900">{{ formatEth(b.amount) }}</span>
               </li>
             </ul>
@@ -119,13 +121,15 @@
 import Header from '~/components/User/Header.vue'
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
+import { ethers } from 'ethers'
 import { useAuctionApi } from '~/composables/useAuctionApi'
 
 const route = useRoute()
 const auction = ref<any>(null)
 const bidders = ref<any[]>([])
 const bidAmount = ref(0)
-const { getAuctionDetail, getAllBids, placeBid } = useAuctionApi()
+const isPlacing = ref(false)
+const { getAuctionDetail, getAllBids, recordBid } = useAuctionApi()
 
 // Countdown
 const countdown = ref({ DAYS: '00', HOURS: '00', MINUTES: '00', SECONDS: '00' })
@@ -133,11 +137,9 @@ const progress = ref(0)
 let timer: any = null
 
 const updateCountdown = () => {
-  if (!auction.value?.endTime) return
-  const start = new Date(auction.value.startTime).getTime()
-  const end = new Date(auction.value.endTime).getTime()
+  if (!auction.value?.onchain?.endTime) return
+  const end = new Date(auction.value.onchain.endTime).getTime()
   const now = Date.now()
-  const total = end - start
   const remaining = Math.max(0, end - now)
 
   const days = Math.floor(remaining / (1000 * 60 * 60 * 24))
@@ -152,8 +154,7 @@ const updateCountdown = () => {
     SECONDS: String(seconds).padStart(2, '0')
   }
 
-  const passed = Math.min(1, (now - start) / total)
-  progress.value = Math.min(100, passed * 100)
+  progress.value = 100 - (remaining / (end - Date.now() + remaining)) * 100
 }
 
 onMounted(async () => {
@@ -170,33 +171,48 @@ onMounted(async () => {
 
 onUnmounted(() => timer && clearInterval(timer))
 
-// 🪙 Đặt giá
+// 🪙 Đặt giá qua MetaMask
 const placeBidAction = async () => {
   const token = localStorage.getItem('jwt')
-  if (!token) {
-    alert('Bạn cần đăng nhập để đặt giá.')
-    return
-  }
-  if (!bidAmount.value || bidAmount.value <= 0) {
-    alert('Vui lòng nhập số tiền hợp lệ.')
-    return
-  }
+  if (!token) return alert('Bạn cần đăng nhập để đặt giá.')
+  if (!window.ethereum) return alert('Vui lòng cài đặt MetaMask.')
+  if (!bidAmount.value || bidAmount.value <= 0) return alert('Vui lòng nhập số tiền hợp lệ.')
 
   try {
-    const address = route.params.address as string
-    const tx = await placeBid(address, bidAmount.value)
-    console.log('Transaction hash:', tx.txHash)
-    auction.value = await getAuctionDetail(address)
-    bidders.value = await getAllBids(address)
+    isPlacing.value = true
+    const provider = new ethers.providers.Web3Provider(window.ethereum)
+    await provider.send('eth_requestAccounts', [])
+    const signer = provider.getSigner()
+    const userAddress = await signer.getAddress()
+    const contractAddress = route.params.address as string
+
+    const abi = ['function placeBid(uint _amount) payable']
+    const contract = new ethers.Contract(contractAddress, abi, signer)
+
+    // deposit 10% (giả định)
+    const deposit = bidAmount.value * 0.1
+    const tx = await contract.placeBid(ethers.utils.parseEther(bidAmount.value.toString()), {
+      value: ethers.utils.parseEther(deposit.toString())
+    })
+
+    alert('⏳ Giao dịch đang xử lý, vui lòng chờ xác nhận...')
+    await tx.wait()
+
+    // ✅ Ghi nhận lại DB sau khi on-chain xong
+    await recordBid(contractAddress, bidAmount.value, tx.hash)
+
+    auction.value = await getAuctionDetail(contractAddress)
+    bidders.value = await getAllBids(contractAddress)
     bidAmount.value = 0
-    alert('✅ Đặt giá thành công!')
+    alert(`✅ Đặt giá thành công! TxHash: ${tx.hash}`)
   } catch (err: any) {
     console.error(err)
     alert(err?.message || 'Đặt giá thất bại!')
+  } finally {
+    isPlacing.value = false
   }
 }
 
-// Helper
 const formatDate = (dateStr: string) => new Date(dateStr).toLocaleString('vi-VN')
-const formatEth = (val: number | string) => (val ? `${Number(val).toFixed(2)} ETH` : '—')
+const formatEth = (val: number | string) => (val ? `${Number(val).toFixed(4)} ETH` : '—')
 </script>

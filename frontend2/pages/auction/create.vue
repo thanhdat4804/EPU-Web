@@ -90,8 +90,9 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref } from 'vue'
+import { ethers } from 'ethers'
 import { useRouter } from '#app'
 import { useAuctionApi } from '~/composables/useAuctionApi'
 
@@ -99,36 +100,75 @@ const name = ref('')
 const description = ref('')
 const imageUrl = ref('')
 const startingPrice = ref(0)
-const reservePrice = ref(null)
+const reservePrice = ref<number | null>(null)
 const biddingTime = ref(60)
 const isCreating = ref(false)
-
 const router = useRouter()
 const { createAuction } = useAuctionApi()
 
 const onSubmit = async () => {
   try {
+    if (!window.ethereum) return alert('Vui lòng cài đặt MetaMask!')
+    const token = localStorage.getItem('jwt')
+    if (!token) return alert('Bạn cần đăng nhập trước.')
+
     isCreating.value = true
 
+    // === GIAI ĐOẠN 1: DEPLOY CONTRACT QUA METAMASK ===
+    const provider = new ethers.providers.Web3Provider(window.ethereum)
+    await provider.send('eth_requestAccounts', [])
+    const signer = provider.getSigner()
+    const userAddress = await signer.getAddress() // ← ĐÚNG: address string
+
+    // ĐÚNG: ABI + ADDRESS
+    const factoryAddress = '0x5FbDB2315678afecb367f032d93F642f64180aa3'
+    const factoryABI = [
+      'function createAction(uint256 _biddingTime, address _seller) external',
+      'function getAllActions() external view returns (address[] memory)',
+      'event ActionCreated(address indexed seller, address actionAddress, uint endTime)' // ← ĐÚNG
+    ]
+
+    const factory = new ethers.Contract(factoryAddress, factoryABI, signer)
+
+    // ĐÚNG: GỌI createAction(biddingTime, seller)
+    const tx = await factory.createAction(
+      biddingTime.value,        // ← uint256 (giây)
+      userAddress,              // ← address
+      { gasLimit: 5000000 }     // ← BẮT BUỘC
+    )
+
+    alert('Đang tạo đấu giá trên blockchain...')
+    const receipt = await tx.wait()
+
+    // ĐÚNG: LẤY ĐỊA CHỈ TỪ EVENT
+    const event = receipt.events?.find(e => e.event === 'ActionCreated')
+    if (!event?.args?.actionAddress) throw new Error('Không tìm thấy địa chỉ mới!')
+    const contractAddress = event.args.actionAddress
+
+    console.log('Auction created at:', contractAddress)
+
+    // === GIAI ĐOẠN 2: LƯU VÀO DB ===
     const auctionData = {
+      contractAddress,
       name: name.value,
       description: description.value,
       imageUrl: imageUrl.value,
       startingPrice: startingPrice.value,
-      reservePrice: reservePrice.value,
-      duration: biddingTime.value,
+      reservePrice: reservePrice.value ?? undefined,
+      duration: biddingTime.value
     }
 
     const result = await createAuction(auctionData)
-
-    if (result && result.contractAddress) {
-  router.push(`/auction/${result.contractAddress}`)
+    if (result?.contractAddress) {
+      alert('Tạo đấu giá thành công!')
+      router.push(`/auction/${result.contractAddress}`)
     } else {
-      alert('Không nhận được thông tin đấu giá mới!')
+      alert('Lỗi: Không nhận được kết quả từ server')
     }
-  } catch (err) {
-    console.error(err)
-    alert('Tạo đấu giá thất bại!')
+
+  } catch (err: any) {
+    console.error('Lỗi:', err)
+    alert(`Tạo đấu giá thất bại: ${err.message || 'Lỗi không xác định'}`)
   } finally {
     isCreating.value = false
   }

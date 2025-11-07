@@ -21,6 +21,7 @@ model User {
   createdAt            DateTime  @default(now())
   resetToken           String?      // Mã reset mật khẩu ngẫu nhiên
   resetTokenExpire     DateTime?    // Thời điểm hết hạn mã (VD: 15 phút)
+  transactions Transaction[]
 }
 
 model Category {
@@ -93,6 +94,7 @@ model Bid {
   id         Int       @id @default(autoincrement())
   bidder     User      @relation(fields: [bidderId], references: [id])
   bidderId   Int
+  txHash     String?
   auction    Auction   @relation(fields: [auctionId], references: [id])
   auctionId  Int
   amount     Float
@@ -101,12 +103,16 @@ model Bid {
 }
 
 model Transaction {
-  id          Int       @id @default(autoincrement())
-  txHash      String    @unique
-  fromAddress String
-  toAddress   String
-  amount      Float
-  auction     Auction?  @relation(fields: [auctionId], references: [id])
-  auctionId   Int?
-  createdAt   DateTime  @default(now())
+  id           Int       @id @default(autoincrement())
+  txHash       String?   @unique
+  fromAddress  String?   // ✅ có thể null vì khi recordPayment từ MetaMask bạn không cần truyền
+  toAddress    String?   // ✅ tương tự
+  amount       Float?    // ✅ có thể không truyền khi là payment record
+  auctionId    Int?
+  auction      Auction?  @relation(fields: [auctionId], references: [id])
+  type         String    // “bid”, “payment”, ...
+  userId       Int?      // ✅ để tránh lỗi khi user chưa có (vd admin action)
+  user         User?     @relation(fields: [userId], references: [id])
+  createdAt    DateTime  @default(now())
 }
+
