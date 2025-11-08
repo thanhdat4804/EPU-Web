@@ -1,4 +1,3 @@
-// composables/useAuctionApi.ts
 import { $fetch } from 'ofetch'
 
 const API_BASE = 'http://localhost:3001/auction'
@@ -19,6 +18,19 @@ export function useAuctionApi() {
     return await $fetch(`${API_BASE}/${address}/bids`)
   }
 
+  // 🟢 LẤY DANH SÁCH ĐẤU GIÁ BẠN THẮNG (MỚI)
+  const getMyWinningAuctions = async (): Promise<any[]> => {
+    const token = localStorage.getItem('jwt')
+    if (!token) throw new Error('Bạn chưa đăng nhập')
+
+    return await $fetch(`${API_BASE}/my-wins`, {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    })
+  }
+
   // 🟢 Tạo đấu giá mới (vẫn do backend deploy)
   const createAuction = async (auctionData: any): Promise<any> => {
     const token = localStorage.getItem('jwt')
@@ -31,7 +43,7 @@ export function useAuctionApi() {
     })
   }
 
-  // ⚡ Ghi nhận đặt giá (sau khi MetaMask placeBid xong)
+  // Ghi nhận đặt giá (sau khi MetaMask placeBid xong)
   const recordBid = async (address: string, amount: number, txHash: string): Promise<any> => {
     const token = localStorage.getItem('jwt')
     if (!token) throw new Error('User not logged in')
@@ -43,7 +55,7 @@ export function useAuctionApi() {
     })
   }
 
-  // ⚡ Ghi nhận thanh toán người thắng (sau khi MetaMask pay xong)
+  // Ghi nhận thanh toán người thắng (sau khi MetaMask pay xong)
   const recordPayment = async (address: string, txHash: string): Promise<any> => {
     const token = localStorage.getItem('jwt')
     if (!token) throw new Error('User not logged in')
@@ -55,18 +67,22 @@ export function useAuctionApi() {
     })
   }
 
-  // 🟢 Buyer xác nhận đã nhận hàng
-  const confirmReceived = async (address: string): Promise<any> => {
+  // Buyer xác nhận đã nhận hàng
+  const confirmReceived = async (address: string, txHash: string): Promise<any> => {
     const token = localStorage.getItem('jwt')
-    if (!token) throw new Error('User not logged in')
+    if (!token) throw new Error('Bạn chưa đăng nhập')
 
     return await $fetch(`${API_BASE}/${address}/confirm`, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${token}` },
+      headers: { 
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}` 
+      },
+      body: { txHash }, // ← BẮT BUỘC GỬI txHash
     })
   }
 
-  // 🟢 Mở tranh chấp
+  // Mở tranh chấp
   const openDispute = async (address: string): Promise<any> => {
     const token = localStorage.getItem('jwt')
     if (!token) throw new Error('User not logged in')
@@ -77,7 +93,7 @@ export function useAuctionApi() {
     })
   }
 
-  // 🟢 Seller hoàn tiền cho buyer
+  // Seller hoàn tiền cho buyer
   const refundBuyer = async (address: string): Promise<any> => {
     const token = localStorage.getItem('jwt')
     if (!token) throw new Error('User not logged in')
@@ -88,7 +104,7 @@ export function useAuctionApi() {
     })
   }
 
-  // 🟢 Người thua rút tiền cọc
+  // Người thua rút tiền cọc
   const withdrawDeposit = async (address: string): Promise<any> => {
     const token = localStorage.getItem('jwt')
     if (!token) throw new Error('User not logged in')
@@ -99,7 +115,7 @@ export function useAuctionApi() {
     })
   }
 
-  // 🟢 Phạt người thắng không thanh toán
+  // Phạt người thắng không thanh toán
   const penalizeWinner = async (address: string): Promise<any> => {
     const token = localStorage.getItem('jwt')
     if (!token) throw new Error('User not logged in')
@@ -114,6 +130,7 @@ export function useAuctionApi() {
     getAuctions,
     getAuctionDetail,
     getAllBids,
+    getMyWinningAuctions, // ĐÃ THÊM
     createAuction,
     recordBid,
     recordPayment,

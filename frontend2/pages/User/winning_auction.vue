@@ -1,9 +1,14 @@
 <template>
   <div class="bg-gray-50 min-h-screen p-8">
-    <h1 class="text-3xl font-bold mb-8 text-center">Các phiên đấu giá bạn đã thắng</h1>
+    <h1 class="text-3xl font-bold mb-8 text-center text-gray-800">
+      Các phiên đấu giá bạn đã thắng
+    </h1>
 
     <!-- Loading -->
-    <div v-if="loading" class="text-center text-gray-600 text-lg">Đang tải...</div>
+    <div v-if="loading" class="text-center py-16">
+      <div class="inline-block animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
+      <p class="mt-3 text-gray-600">Đang tải danh sách...</p>
+    </div>
 
     <!-- Danh sách -->
     <div v-else>
@@ -11,31 +16,46 @@
         <div
           v-for="a in auctions"
           :key="a.contractAddress"
-          class="bg-white p-6 rounded-2xl shadow border border-gray-200 flex flex-col justify-between"
+          class="bg-white p-6 rounded-2xl shadow-md border border-gray-200 hover:shadow-xl transition-all duration-300 flex flex-col justify-between"
         >
           <!-- Hình ảnh + thông tin -->
           <div>
             <img
               :src="a.item?.imageUrl || '/no-image.jpg'"
-              class="w-full h-48 object-cover rounded-xl mb-4"
+              class="w-full h-48 object-cover rounded-xl mb-4 shadow-sm"
               alt="Ảnh vật phẩm"
             />
-            <h2 class="text-xl font-semibold mb-2">{{ a.item?.name }}</h2>
-            <p class="text-gray-600 mb-2 line-clamp-2">{{ a.item?.description }}</p>
+            <h2 class="text-xl font-semibold mb-2 text-gray-800">{{ a.item?.name }}</h2>
+            <p class="text-gray-600 mb-3 line-clamp-2">{{ a.item?.description }}</p>
+
+            <!-- Giá thắng -->
             <p class="text-gray-700 mb-1">
-              <b>Giá thắng:</b> {{ formatEth(a.onchain?.highestBid || a.item?.startingPrice) }}
+              <b class="text-green-600">Giá thắng:</b>
+              <span class="font-mono text-lg ml-1">{{ formatEth(a.winningBid) }}</span>
             </p>
+
+            <!-- Đã thanh toán bao nhiêu -->
+            <p class="text-gray-700 mb-1" v-if="a.status !== 'Ended'">
+              <b>Đã gửi:</b>
+              <span class="font-mono">{{ formatEth(a.winningBid * 0.9) }}</span>
+              <span class="text-sm text-gray-500 ml-1">(90% còn lại)</span>
+            </p>
+
+            <!-- Thời gian kết thúc -->
             <p class="text-gray-700 mb-1">
-              <b>Thời gian kết thúc:</b> {{ formatDate(a.endTime) }}
+              <b>Kết thúc:</b> {{ formatDate(a.endTime) }}
             </p>
-            <p class="text-gray-700 mb-2">
+
+            <!-- Trạng thái -->
+            <p class="text-gray-700 mb-3">
               <b>Trạng thái:</b>
               <span
-                class="px-2 py-1 rounded text-white text-sm"
+                class="px-3 py-1 rounded-full text-white text-sm font-medium ml-2"
                 :class="{
-                  'bg-green-600': a.status === 'Ended',
+                  'bg-orange-500': a.status === 'Ended',
                   'bg-blue-600': a.status === 'Paid',
-                  'bg-red-500': a.status === 'Penalized',
+                  'bg-green-600': a.status === 'Completed',
+                  'bg-red-600': a.status === 'Penalized',
                 }"
               >
                 {{ statusText(a.status) }}
@@ -43,33 +63,52 @@
             </p>
           </div>
 
-          <!-- Nút hành động -->
-          <div class="mt-4">
-            <!-- Chưa thanh toán -->
+          <!-- NÚT HÀNH ĐỘNG -->
+          <div class="mt-4 space-y-2">
+            <!-- 1. Chưa thanh toán → Gửi phần còn lại -->
             <button
               v-if="a.status === 'Ended'"
-              @click="payAuction(a)"
+              @click="payRemaining(a)"
               :disabled="paying"
-              class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition disabled:opacity-70"
+              class="w-full bg-gradient-to-r from-orange-500 to-red-600 text-white py-3 rounded-lg font-semibold hover:from-orange-600 hover:to-red-700 transition-all disabled:opacity-60"
             >
-              {{ paying ? 'Đang xử lý...' : 'Thanh toán ngay' }}
+              <span v-if="paying">Đang gửi...</span>
+              <span v-else>Thanh toán {{ formatEth(a.winningBid * 0.9) }}</span>
             </button>
 
-            <!-- Đã thanh toán hoặc bị phạt -->
+            <!-- 2. Đã thanh toán → Xác nhận nhận hàng -->
             <button
-              v-else
-              disabled
-              class="w-full bg-gray-400 text-white py-2 rounded-lg cursor-not-allowed"
+              v-else-if="a.status === 'Paid'"
+              @click="confirmReceived(a)"
+              :disabled="confirming"
+              class="w-full bg-gradient-to-r from-blue-600 to-blue-700 text-white py-3 rounded-lg font-semibold hover:from-blue-700 hover:to-blue-800 transition-all disabled:opacity-60"
             >
-              {{ a.status === 'Paid' ? 'Đã thanh toán' : 'Đã bị phạt' }}
+              <span v-if="confirming">Đang xác nhận...</span>
+              <span v-else>Xác nhận đã nhận hàng</span>
             </button>
+
+            <!-- 3. Hoàn tất / Bị phạt -->
+            <div
+              v-else
+              class="w-full py-3 text-center font-medium rounded-lg"
+              :class="{
+                'bg-green-100 text-green-700': a.status === 'Completed',
+                'bg-red-100 text-red-700': a.status === 'Penalized',
+              }"
+            >
+              {{ a.status === 'Completed' ? 'Hoàn tất' : 'Bị phạt (mất cọc)' }}
+            </div>
           </div>
         </div>
       </div>
 
       <!-- Không có dữ liệu -->
-      <div v-else class="text-center text-gray-600 text-lg mt-10">
-        Bạn chưa thắng đấu giá nào.
+      <div v-else class="text-center py-20">
+        <div class="text-6xl mb-4 text-gray-300">Chưa có chiến thắng</div>
+        <p class="text-gray-600 text-lg mb-4">Bạn chưa thắng bất kỳ phiên đấu giá nào.</p>
+        <NuxtLink to="/" class="text-blue-600 hover:underline font-medium">
+          Quay lại trang chủ
+        </NuxtLink>
       </div>
     </div>
   </div>
@@ -83,91 +122,111 @@ import { useAuctionApi } from '~/composables/useAuctionApi'
 const auctions = ref<any[]>([])
 const loading = ref(true)
 const paying = ref(false)
-const myWallet = ref<string>('')
+const confirming = ref(false)
 
-const { getAuctions, recordPayment } = useAuctionApi()
+const { getMyWinningAuctions, recordPayment, confirmReceived: apiConfirmReceived } = useAuctionApi()
 
-// Lấy danh sách + ví MetaMask
+// LẤY DANH SÁCH THẮNG TỪ API
 onMounted(async () => {
   try {
-    // BƯỚC 1: Kết nối MetaMask để lấy địa chỉ ví
-    if (!window.ethereum) {
-      alert('Cài đặt MetaMask để sử dụng!')
-      loading.value = false
-      return
-    }
-
-    const provider = new ethers.providers.Web3Provider(window.ethereum)
-    await provider.send('eth_requestAccounts', [])
-    const signer = provider.getSigner()
-    myWallet.value = await signer.getAddress()
-
-    // BƯỚC 2: Lấy danh sách tất cả auction
-    const allAuctions = await getAuctions()
-
-    // BƯỚC 3: Lọc chỉ những phiên bạn thắng
-    auctions.value = allAuctions
+    auctions.value = await getMyWinningAuctions()
   } catch (err: any) {
-    console.error('Lỗi tải danh sách:', err)
-    alert('Không thể tải danh sách đấu giá. Vui lòng thử lại.')
+    alert(err.message || 'Không thể tải danh sách đấu giá thắng')
   } finally {
     loading.value = false
   }
 })
 
-// Thanh toán
-const payAuction = async (auction: any) => {
+// 1. THANH TOÁN PHẦN CÒN LẠI (90%)
+const payRemaining = async (auction: any) => {
   if (paying.value) return
   paying.value = true
 
   try {
-    if (!window.ethereum) throw new Error('MetaMask chưa được cài đặt')
+    if (!window.ethereum) throw new Error('Cài MetaMask!')
 
     const provider = new ethers.providers.Web3Provider(window.ethereum)
     await provider.send('eth_requestAccounts', [])
     const signer = provider.getSigner()
-    const userAddress = await signer.getAddress()
 
-    // Kiểm tra người dùng có phải người thắng
-    if (userAddress.toLowerCase() !== auction.onchain.highestBidder.toLowerCase()) {
-      alert('Bạn không phải người thắng cuộc!')
-      return
-    }
-
-    // Gọi contract
     const contract = new ethers.Contract(
       auction.contractAddress,
       ['function payWinningBid() payable'],
       signer
     )
 
-    const amount = ethers.parseEther(String(auction.onchain.highestBid || 0))
-    const tx = await contract.payWinningBid({ value: amount })
-    alert('Đang gửi giao dịch... Vui lòng chờ xác nhận.')
+    const remaining = ethers.utils.parseEther((auction.winningBid * 0.9).toString())
+    const tx = await contract.payWinningBid({ value: remaining })
+    alert('Đang gửi giao dịch...')
 
     const receipt = await tx.wait()
 
-    // Ghi nhận backend
+    // GHI NHẬN BACKEND
     await recordPayment(auction.contractAddress, receipt.transactionHash)
 
-    // Cập nhật UI
+    // CẬP NHẬT UI
     auction.status = 'Paid'
-    alert('Thanh toán thành công!')
+    alert('Thanh toán thành công! Vui lòng chờ nhận hàng.')
   } catch (err: any) {
-    console.error('Lỗi thanh toán:', err)
     alert(err?.message || 'Thanh toán thất bại!')
   } finally {
     paying.value = false
   }
 }
 
-// Helper
-const formatDate = (d: string) => new Date(d).toLocaleString('vi-VN')
+// 2. XÁC NHẬN ĐÃ NHẬN HÀNG → CHUYỂN TIỀN CHO SELLER
+const confirmReceived = async (auction: any) => {
+  if (confirming.value) return
+  confirming.value = true
+
+  try {
+    if (!window.ethereum) throw new Error('Cài MetaMask!')
+
+    const provider = new ethers.providers.Web3Provider(window.ethereum)
+    await provider.send('eth_requestAccounts', [])
+    const signer = provider.getSigner()
+
+    const contract = new ethers.Contract(
+      auction.contractAddress,
+      ['function confirmReceived()'],
+      signer
+    )
+
+    const tx = await contract.confirmReceived()
+    alert('Đang xác nhận...')
+
+    const receipt = await tx.wait()
+    if (!receipt.status) throw new Error('Giao dịch thất bại')
+
+    // GỌI API VỚI txHash
+    await confirmReceived(auction.contractAddress, receipt.transactionHash)
+
+    auction.status = 'Completed'
+    alert('Xác nhận thành công!')
+  } catch (err: any) {
+    alert(err.message || 'Xác nhận thất bại!')
+  } finally {
+    confirming.value = false
+  }
+}
+
+// HELPER
+const formatDate = (d: string) =>
+  new Date(d).toLocaleString('vi-VN', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+
 const formatEth = (v: number | string) => `${Number(v).toFixed(4)} ETH`
+
 const statusText = (status: string) => {
   switch (status) {
-    case 'Ended': return 'Đã kết thúc'
-    case 'Paid': return 'Đã thanh toán'
+    case 'Ended': return 'Chưa thanh toán'
+    case 'Paid': return 'Đã thanh toán, chờ nhận hàng'
+    case 'Completed': return 'Hoàn tất'
     case 'Penalized': return 'Bị phạt'
     default: return status
   }

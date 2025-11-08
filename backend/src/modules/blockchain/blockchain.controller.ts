@@ -66,4 +66,22 @@ export class BlockchainController {
   async getAllBids(@Param('address') address: string) {
     return this.blockchainService.getAllBids(address);
   }
+
+  // 🟢 Lấy danh sách đấu giá thắng của user(DB)
+  @Get('my-wins')
+  @UseGuards(JwtAuthGuard)
+  async getMyWinningAuctions(@Req() req) {
+    return this.blockchainService.getWinningAuctions(req.user.id);
+  }
+
+  // 🟢 Xác nhận đã nhận hàng (sau khi người thắng đã thanh toán)
+  @Post(':address/confirm')
+  @UseGuards(JwtAuthGuard)
+  async confirmReceived(
+    @Param('address') address: string,
+    @Body('txHash') txHash: string,
+    @Req() req: any,
+  ) {
+    return this.blockchainService.confirmReceived(req.user.id, address, txHash);
+  }
 }

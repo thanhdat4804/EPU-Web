@@ -13,15 +13,16 @@ model User {
   email                String    @unique
   password             String
   wallet               String?   @unique
-  privatekey  String?   // 🔒 lưu private key đã mã hóa
-  role                 String    @default("User") // User | Admin | Seller
+  privatekey           String?
+  role                 String    @default("User")
   items                Item[]
   auctions             Auction[] @relation("SellerAuctions")
   bids                 Bid[]
   createdAt            DateTime  @default(now())
-  resetToken           String?      // Mã reset mật khẩu ngẫu nhiên
-  resetTokenExpire     DateTime?    // Thời điểm hết hạn mã (VD: 15 phút)
-  transactions Transaction[]
+  resetToken           String?
+  resetTokenExpire     DateTime?
+  wonAuctions          AuctionWinner[] @relation("UserWonAuctions") // ✅ user thắng nhiều auction
+  transactions         Transaction[]
 }
 
 model Category {
@@ -78,16 +79,28 @@ model ReviewResult {
 model Auction {
   id              Int       @id @default(autoincrement())
   item            Item      @relation(fields: [itemId], references: [id])
-  itemId          Int       @unique  // ✅ mỗi item chỉ có 1 auction
+  itemId          Int       @unique
   seller          User      @relation("SellerAuctions", fields: [sellerId], references: [id])
   sellerId        Int
   contractAddress String    @unique
   startTime       DateTime
   endTime         DateTime
-  status          String    @default("Active") // Active | Ended | Cancelled
+  status          String    @default("Active")
   bids            Bid[]
   transactions    Transaction[]
+  winner          AuctionWinner? @relation("AuctionHasWinner") // ✅ đặt tên rõ ràng
   createdAt       DateTime  @default(now())
+}
+
+model AuctionWinner {
+  id           Int      @id @default(autoincrement())
+  auction      Auction  @relation("AuctionHasWinner", fields: [auctionId], references: [id]) // ✅ đối xứng với Auction
+  auctionId    Int      @unique
+  bidder       User     @relation("UserWonAuctions", fields: [bidderId], references: [id])  // ✅ đối xứng với User
+  bidderId     Int
+  bidAmount    Decimal
+  txHash       String?
+  finalizedAt  DateTime @default(now())
 }
 
 model Bid {

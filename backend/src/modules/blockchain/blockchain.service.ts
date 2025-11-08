@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Logger, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ethers } from 'ethers';
 import { Cron, CronExpression } from '@nestjs/schedule';
@@ -144,7 +144,6 @@ export class BlockchainService {
 
   @Cron(CronExpression.EVERY_MINUTE)
   async autoFinalizeAuctions() {
-    if (!this.adminWallet) return;
     const now = new Date();
     const auctions = await this.prisma.auction.findMany({
       where: { status: 'Active', endTime: { lte: now } },
@@ -152,18 +151,54 @@ export class BlockchainService {
 
     for (const a of auctions) {
       try {
-        const contract = new ethers.Contract(a.contractAddress, this.auctionABI, this.adminWallet);
-        const ended = await contract.ended().catch(() => true);
+        const contract = new ethers.Contract(a.contractAddress, this.auctionABI, this.adminWallet || this.provider);
+        const ended = await contract.ended();
         if (ended) continue;
+
+        const [highestBidder, highestBid] = await Promise.all([
+          contract.highestBidder(),
+          contract.highestBid(),
+        ]);
+
+        if (highestBidder === ethers.constants.AddressZero) {
+          await this.prisma.auction.update({
+            where: { id: a.id },
+            data: { status: 'Ended' },
+          });
+          continue;
+        }
+
         const tx = await contract.finalize();
         await tx.wait();
+
+        // LẤY USER ID TỪ ĐỊA CHỈ VÍ
+        const bidderUser = await this.prisma.user.findUnique({
+          where: { wallet: highestBidder},
+        });
+
+        if (!bidderUser) {
+          this.logger.warn(`Bidder wallet not found: ${highestBidder}`);
+          continue;
+        }
+
+        // TẠO BẢN GHI WINNER
+        await this.prisma.auctionWinner.create({
+          data: {
+            auction: { connect: { id: a.id } },
+            bidder: { connect: { id: bidderUser.id } },
+            bidAmount: parseFloat(ethers.utils.formatEther(highestBid)),
+          },
+        });
+
+        // CẬP NHẬT AUCTION
         await this.prisma.auction.update({
           where: { id: a.id },
           data: { status: 'Ended' },
         });
-        this.logger.log(`Finalized auction: ${a.contractAddress}`);
+
+        this.logger.log(`Auction finalized: ${a.contractAddress} | Winner: ${highestBidder}`);
       } catch (err: any) {
-        this.logger.error(`Finalize error for ${a.contractAddress}: ${err.message}`);
+        this.logger.error(`Finalize error: ${err.message}`);
       }
     }
   }
@@ -217,20 +252,66 @@ export class BlockchainService {
   /**
    * Helper: tạo transaction record với quan hệ đúng kiểu
    */
-  private createTransactionData(
-    base: Pick<Prisma.TransactionCreateInput, 'txHash' | 'type'> & {
-      amount?: number;
-      fromAddress?: string;
-      toAddress?: string;
-    },
-    userId: number,
-    auctionId: number,
-  ): Prisma.TransactionCreateInput {
-    return {
-      ...base,
-      user: { connect: { id: userId } },
-      auction: { connect: { id: auctionId } },
-    };
+    private createTransactionData(
+      base: Pick<Prisma.TransactionCreateInput, 'txHash' | 'type'> & {
+        amount?: number;
+        fromAddress?: string;
+        toAddress?: string;
+      },
+      userId: number,
+      auctionId: number,
+    ): Prisma.TransactionCreateInput {
+      return {
+        ...base,
+        user: { connect: { id: userId } },
+        auction: { connect: { id: auctionId } },
+      };
+    }
+
+    // LẤY DANH SÁCH ĐẤU GIÁ MÀ USER THẮNG (từ bảng AuctionWinner)
+    async getWinningAuctions(userId: number) {
+    const winners = await this.prisma.auctionWinner.findMany({
+      where: {
+        bidderId: userId,
+      },
+      include: {
+        auction: {
+          include: {
+            item: {
+              select: {
+                name: true,
+                description: true,
+                imageUrl: true,
+                startingPrice: true,
+              },
+            },
+            seller: {
+              select: {
+                name: true,
+                email: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: {
+        finalizedAt: 'desc',
+      },
+    });
+
+    // Format trả về cho FE
+    return winners.map((w) => ({
+      id: w.auction.id,
+      contractAddress: w.auction.contractAddress,
+      item: w.auction.item,
+      seller: w.auction.seller,
+      startTime: w.auction.startTime,
+      endTime: w.auction.endTime,
+      status: w.auction.status,
+      winningBid: w.bidAmount,
+      finalizedAt: w.finalizedAt,
+      txHash: w.txHash,
+    }));
   }
 
 
@@ -268,52 +349,185 @@ export class BlockchainService {
     return { message: 'Bid recorded successfully', txHash };
   }
 
+  // Ghi nhận thanh toán người thắng
   async recordPayment(userId: number, address: string, txHash: string) {
-    const auction = await this.prisma.auction.findUnique({
-      where: { contractAddress: address },
-      select: { id: true, sellerId: true, item: { select: { startingPrice: true } } },
-    });
-    if (!auction) throw new NotFoundException('Auction not found');
+    console.log('recordPayment() STARTED', { userId, address, txHash });
 
-    // KIỂM TRA TRÙNG txHash TRONG transaction
-    const existingTx = await this.prisma.transaction.findUnique({
-      where: { txHash }
-    });
+    try {
+      // 1. LẤY AUCTION + AuctionWinner (có bidAmount)
+      const auction = await this.prisma.auction.findUnique({
+        where: { contractAddress: address },
+        select: {
+          id: true,
+          status: true,
+          winner: {
+            select: {
+              bidderId: true,
+              bidAmount: true,          // ← LẤY GIÁ THẮNG TỪ ĐÂY
+              bidder: {
+                select: { id: true, wallet: true },
+              },
+            },
+          },
+        },
+      });
 
-    if (existingTx) {
-      // ĐÃ TỒN TẠI → TRẢ VỀ THÀNH CÔNG (không lỗi 500)
+      if (!auction) throw new NotFoundException('Auction not found');
+      if (!auction.winner) throw new BadRequestException('Chưa có người thắng');
+      if (auction.winner.bidderId !== userId) throw new ForbiddenException('Bạn không phải người thắng');
+
+      const bidderWallet = auction.winner.bidder.wallet;
+      if (!bidderWallet) throw new BadRequestException('Chưa liên kết ví');
+
+      const winningBid = Number(auction.winner.bidAmount);
+      if (isNaN(winningBid) || winningBid <= 0) {
+        throw new BadRequestException('Giá thắng không hợp lệ');
+      }
+
+      // 2. KIỂM TRA txHash ĐÃ TỒN TẠI
+      const existingTx = await this.prisma.transaction.findUnique({ where: { txHash } });
+      if (existingTx) {
+        console.log('Transaction already recorded:', existingTx.id);
+        return { success: true, message: 'Đã ghi nhận', transaction: existingTx };
+      }
+
+      // 3. KIỂM TRA GIAO DỊCH TRÊN CHAIN
+      const provider = new ethers.providers.JsonRpcProvider('http://127.0.0.1:8545');
+      const receipt = await provider.getTransactionReceipt(txHash);
+      if (!receipt) {
+        const blockNumber = await provider.getBlockNumber();
+        throw new BadRequestException(`Giao dịch chưa confirm. Block hiện tại: ${blockNumber}`);
+      }
+      if (!receipt.status) {
+        throw new BadRequestException('Giao dịch thất bại trên chain');
+      }
+      console.log('Receipt confirmed:', receipt.blockNumber);
+
+      // 4. KIỂM TRA isPaidToSeller
+      const contract = new ethers.Contract(address, this.auctionABI, provider);
+      const isPaid = await contract.isPaidToSeller();
+      console.log('isPaidToSeller:', isPaid);
+      if (!isPaid) {
+        throw new BadRequestException('Chưa thanh toán trên chain');
+      }
+
+      // 5. TÍNH TOÁN 90%
+      const amount = winningBid * 0.9;
+
+      // 6. GHI NHẬN DB
+      const transaction = await this.prisma.transaction.create({
+        data: this.createTransactionData(
+          { txHash, type: 'payment', amount, toAddress: address },
+          userId,
+          auction.id,
+        ),
+      });
+      console.log('Transaction saved:', transaction.id);
+
+      // 7. CẬP NHẬT TRẠNG THÁI
+      await this.prisma.auction.update({
+        where: { id: auction.id },
+        data: { status: 'Paid' },
+      });
+      console.log('Auction status → Paid');
+
       return {
         success: true,
-        message: 'Giao dịch thanh toán đã được ghi nhận trước đó',
-        transaction: existingTx
+        message: 'Ghi nhận thanh toán thành công',
+        transaction,
+        txHash,
       };
+    } catch (error: any) {
+      console.error('recordPayment() ERROR:', error.message);
+      throw error;
     }
+  }
 
-    // CHƯA TỒN TẠI → TẠO MỚI
-    const transaction = await this.prisma.transaction.create({
-      data: this.createTransactionData(
-        {
-          txHash,
-          type: 'payment',
-          amount: auction.item.startingPrice, // hoặc lấy từ chain
-          toAddress: address
+  async confirmReceived(userId: number, address: string, txHash: string) {
+    console.log('confirmReceived() STARTED', { userId, address, txHash });
+
+    try {
+      // 1. LẤY AUCTION + WINNER
+      const auction = await this.prisma.auction.findUnique({
+        where: { contractAddress: address },
+        select: {
+          id: true,
+          status: true,
+          winner: {
+            select: {
+              bidderId: true,
+              bidder: {
+                select: { id: true, wallet: true },
+              },
+            },
+          },
         },
-        userId,
-        auction.id,
-      ),
-    });
+      });
 
-    // CẬP NHẬT TRẠNG THÁI AUCTION
-    await this.prisma.auction.update({
-      where: { id: auction.id },
-      data: { status: 'Paid'},
-    });
+      if (!auction) throw new NotFoundException('Auction not found');
+      if (!auction.winner) throw new BadRequestException('Chưa có người thắng');
+      if (auction.winner.bidderId !== userId) throw new ForbiddenException('Bạn không phải người thắng');
 
-    return {
-      success: true,
-      message: 'Ghi nhận thanh toán thành công',
-      transaction
-    };
+      // KIỂM TRA WALLET
+      const bidderWallet = auction.winner.bidder.wallet;
+      if (!bidderWallet) throw new BadRequestException('Chưa liên kết ví');
+
+      // KIỂM TRA TRẠNG THÁI
+      if (auction.status === 'Completed') {
+        return { success: true, message: 'Đã xác nhận trước đó' };
+      }
+      if (auction.status !== 'Paid') {
+        throw new BadRequestException('Chưa thanh toán – không thể xác nhận');
+      }
+
+      // 2. KIỂM TRA txHash ĐÃ TỒN TẠI
+      const existingTx = await this.prisma.transaction.findUnique({ where: { txHash } });
+      if (existingTx) {
+        return { success: true, message: 'Giao dịch đã được ghi nhận' };
+      }
+
+      // 3. KIỂM TRA GIAO DỊCH TRÊN CHAIN
+      const provider = new ethers.providers.JsonRpcProvider('http://127.0.0.1:8545');
+      const receipt = await provider.getTransactionReceipt(txHash);
+      if (!receipt) {
+        const blockNumber = await provider.getBlockNumber();
+        throw new BadRequestException(`Giao dịch chưa confirm. Block hiện tại: ${blockNumber}`);
+      }
+      if (!receipt.status) {
+        throw new BadRequestException('Giao dịch thất bại trên chain');
+      }
+
+      // 4. KIỂM TRA TRẠNG THÁI CONTRACT
+      const contract = new ethers.Contract(address, this.auctionABI, provider);
+      const [isPaid, highestBidder] = await Promise.all([
+        contract.isPaidToSeller(),
+        contract.highestBidder(),
+      ]);
+
+      if (!isPaid) throw new BadRequestException('Chưa thanh toán trên chain');
+      if (highestBidder.toLowerCase() !== bidderWallet.toLowerCase()) {
+        throw new BadRequestException('Không phải người thắng trên chain');
+      }
+
+      // 5. GHI NHẬN DB
+      await this.prisma.transaction.create({
+        data: this.createTransactionData(
+          { txHash, type: 'confirm', amount: 0, toAddress: address },
+          userId,
+          auction.id,
+        ),
+      });
+
+      await this.prisma.auction.update({
+        where: { id: auction.id },
+        data: { status: 'Completed' },
+      });
+
+      return { success: true, message: 'Xác nhận thành công!' };
+    } catch (error: any) {
+      console.error('confirmReceived() ERROR:', error.message);
+      throw error;
+    }
   }
 
   async getAllBids(address: string) {
