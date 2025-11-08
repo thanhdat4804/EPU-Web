@@ -1,151 +1,265 @@
 <template>
-  <div class="min-h-screen bg-white">
-    <!-- Header tái sử dụng -->
+  <div class="min-h-screen bg-gray-50">
+    <!-- Header -->
     <Header />
 
-    <!-- Phần thân -->
-    <div class="border-b border-gray-200 py-6 px-10">
-      <h1 class="text-3xl font-semibold text-gray-900">
-        Hello {{ user?.name || 'Người dùng' }}
+    <!-- Banner -->
+    <div class="border-b border-gray-200 py-8 px-10 bg-white shadow-sm">
+      <h1 class="text-3xl font-bold text-gray-900 tracking-tight">
+        👋 Hello, {{ user?.name || 'Người dùng' }}
       </h1>
+      <p class="text-gray-500 mt-1">Quản lý thông tin tài khoản của bạn</p>
     </div>
 
-    <div class="flex max-w-6xl mx-auto py-10 px-6">
-      <!-- Sidebar trái -->
-      <aside class="w-1/4 border-r border-gray-200 pr-8">
-        <nav class="space-y-4">
+    <!-- Main Content -->
+    <div class="flex max-w-6xl mx-auto py-10 px-6 gap-8">
+      <!-- Sidebar -->
+      <aside
+        class="w-1/4 bg-white shadow-sm rounded-xl border border-gray-100 p-4 h-fit sticky top-20 transition-all">
+        <nav class="space-y-2">
           <button
             v-for="tab in tabs"
             :key="tab.key"
             @click="currentTab = tab.key"
-            class="flex items-center justify-between w-full text-left py-2 px-3 rounded-md transition"
+            class="flex items-center w-full px-4 py-2 rounded-lg transition-all duration-300"
             :class="currentTab === tab.key
-              ? 'bg-blue-50 text-blue-600 font-semibold'
-              : 'text-gray-700 hover:bg-gray-50'"
-          >
-            <span>{{ tab.label }}</span>
-            <span v-if="tab.required" class="text-red-500 text-xs">●</span>
+              ? 'bg-blue-600 text-white shadow'
+              : 'text-gray-700 hover:bg-gray-100 hover:text-blue-600'">
+            <component :is="tab.icon" class="w-5 h-5 mr-2" />
+            <span class="font-medium">{{ tab.label }}</span>
           </button>
         </nav>
       </aside>
 
-      <!-- Nội dung chính -->
-      <main class="flex-1 pl-10">
-        <!-- Tab Account -->
-        <section v-if="currentTab === 'account'">
-          <h2 class="text-2xl font-bold text-gray-800 mb-6">Account</h2>
+      <!-- Main -->
+      <main class="flex-1 transition-all duration-500">
+        <transition name="fade" mode="out-in">
+          <!-- Account Tab -->
+          <section v-if="currentTab === 'account'" key="account" class="bg-white rounded-xl shadow-sm border border-gray-100 p-8">
+            <h2 class="text-2xl font-bold text-gray-800 mb-8">Tài khoản</h2>
 
-          <div class="space-y-6">
-            <!-- Tên -->
-            <div>
-              <label class="block text-sm font-semibold text-gray-700">Name</label>
-              <div class="flex items-center justify-between mt-1">
-                <p class="text-gray-900">{{ user?.name || '—' }}</p>
-                <button class="text-blue-600 text-sm font-medium hover:underline" @click="editField('name')">
-                  Change
+            <div class="space-y-8">
+              <!-- Name -->
+              <div class="flex justify-between items-center border-b pb-4">
+                <div>
+                  <h3 class="font-semibold text-gray-700">Tên</h3>
+                  <p class="text-gray-600 mt-1">{{ user?.name || '—' }}</p>
+                </div>
+                <button
+                  class="text-blue-600 hover:text-blue-800 font-medium transition"
+                  @click="showEditName = true">
+                  Thay đổi
+                </button>
+              </div>
+
+              <!-- Email -->
+              <div class="flex justify-between items-center border-b pb-4">
+                <div>
+                  <h3 class="font-semibold text-gray-700">Email</h3>
+                  <p class="text-gray-600 mt-1">{{ user?.email || '—' }}</p>
+                </div>
+              </div>
+
+              <!-- Password -->
+              <div class="flex justify-between items-center">
+                <div>
+                  <h3 class="font-semibold text-gray-700">Mật khẩu</h3>
+                  <p class="text-gray-600 mt-1">********</p>
+                </div>
+                <button
+                  class="text-blue-600 hover:text-blue-800 font-medium transition"
+                  @click="showEditPassword = true">
+                  Thay đổi
                 </button>
               </div>
             </div>
-
-            <!-- Username -->
-            <div>
-              <label class="block text-sm font-semibold text-gray-700">Username</label>
-              <div class="flex items-center justify-between mt-1">
-                <p class="text-gray-900">{{ user?.username || 'user-' + user?.id }}</p>
-                <p class="text-sm text-gray-500">You can’t edit your username.</p>
-              </div>
-            </div>
-
-            <!-- Email -->
-            <div>
-              <label class="block text-sm font-semibold text-gray-700">Email</label>
-              <div class="flex items-center justify-between mt-1">
-                <p class="text-gray-900">{{ user?.email || '—' }}</p>
-                <button class="text-blue-600 text-sm font-medium hover:underline" @click="editField('email')">
-                  Change
-                </button>
-              </div>
-            </div>
-
-            <!-- Password -->
-            <div>
-              <label class="block text-sm font-semibold text-gray-700">Password</label>
-              <div class="flex items-center justify-between mt-1">
-                <p class="text-gray-900">********</p>
-                <button class="text-blue-600 text-sm font-medium hover:underline" @click="editField('password')">
-                  Change
-                </button>
-              </div>
-            </div>
-
-            <!-- Phone -->
-            <div>
-              <label class="block text-sm font-semibold text-gray-700">Phone number</label>
-              <div class="flex items-center justify-between mt-1">
-                <p class="text-gray-900">{{ user?.phone || 'Not added' }}</p>
-                <button class="text-blue-600 text-sm font-medium hover:underline" @click="editField('phone')">
-                  {{ user?.phone ? 'Change' : 'Add' }}
-                </button>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <!-- Các tab khác -->
-        <section v-else-if="currentTab === 'addresses'">
-          <h2 class="text-2xl font-bold text-gray-800 mb-6">Addresses</h2>
-          <p class="text-gray-600">Bạn chưa có địa chỉ nào.</p>
-        </section>
-
-        <section v-else-if="currentTab === 'payment'">
-          <h2 class="text-2xl font-bold text-gray-800 mb-6">Payment</h2>
-          <p class="text-gray-600">Chưa có phương thức thanh toán được lưu.</p>
-        </section>
-
-        <section v-else-if="currentTab === 'notifications'">
-          <h2 class="text-2xl font-bold text-gray-800 mb-6">Emails & Notifications</h2>
-          <p class="text-gray-600">Quản lý thông báo và email nhận được.</p>
-        </section>
-
-        <section v-else-if="currentTab === 'verification'">
-          <h2 class="text-2xl font-bold text-gray-800 mb-6">Verification</h2>
-          <p class="text-gray-600">Xác minh tài khoản để bảo mật tốt hơn.</p>
-        </section>
+          </section>
+        </transition>
       </main>
     </div>
+
+    <!-- Modal: Đổi tên -->
+    <transition name="fade">
+      <div
+        v-if="showEditName"
+        class="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+        <div class="bg-white rounded-2xl shadow-xl w-96 p-6 animate-fadeIn">
+          <h3 class="text-lg font-semibold mb-4">Đổi tên người dùng</h3>
+          <input
+            v-model="newName"
+            type="text"
+            placeholder="Nhập tên mới"
+            class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500" />
+          <div class="flex justify-end space-x-3 mt-5">
+            <button
+              @click="showEditName = false"
+              class="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg">
+              Hủy
+            </button>
+            <button
+              @click="updateName"
+              class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
+              Lưu
+            </button>
+          </div>
+        </div>
+      </div>
+    </transition>
+
+    <!-- Modal: Đổi mật khẩu -->
+    <transition name="fade">
+      <div
+        v-if="showEditPassword"
+        class="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+        <div class="bg-white rounded-2xl shadow-xl w-96 p-6 animate-fadeIn">
+          <h3 class="text-lg font-semibold mb-4">Đổi mật khẩu</h3>
+
+          <div class="space-y-3">
+            <input
+              v-model="oldPassword"
+              type="password"
+              placeholder="Mật khẩu cũ"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500" />
+
+            <input
+              v-model="newPassword"
+              type="password"
+              placeholder="Mật khẩu mới"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500" />
+
+            <input
+              v-model="confirmPassword"
+              type="password"
+              placeholder="Xác nhận mật khẩu mới"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500" />
+          </div>
+
+          <div class="flex justify-end space-x-3 mt-5">
+            <button
+              @click="showEditPassword = false"
+              class="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg">
+              Hủy
+            </button>
+            <button
+              @click="updatePassword"
+              class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
+              Lưu
+            </button>
+          </div>
+        </div>
+      </div>
+    </transition>
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue'
 import Header from '~/components/User/Header.vue'
+import { User, Home, Lock, Bell, CreditCard } from 'lucide-vue-next'
 
 const user = ref(null)
 const currentTab = ref('account')
 
+const showEditName = ref(false)
+const showEditPassword = ref(false)
+
+const newName = ref('')
+const oldPassword = ref('')
+const newPassword = ref('')
+const confirmPassword = ref('')
+
 const tabs = [
-  { key: 'account', label: 'Account', required: true },
-  { key: 'addresses', label: 'Addresses', required: true },
-  { key: 'payment', label: 'Payment', required: true },
-  { key: 'notifications', label: 'Emails & Notifications', required: true },
-  { key: 'verification', label: 'Verification', required: true },
+  { key: 'account', label: 'Tài khoản', icon: User },
+  { key: 'addresses', label: 'Địa chỉ', icon: Home },
+  { key: 'payment', label: 'Thanh toán', icon: CreditCard },
+  { key: 'notifications', label: 'Thông báo', icon: Bell },
+  { key: 'verification', label: 'Xác minh', icon: Lock },
 ]
 
+// Lấy user
 onMounted(async () => {
   const token = localStorage.getItem('jwt')
   if (!token) return
-
   try {
-    const res = await $fetch('http://localhost:3001/users/me', {
+    user.value = await $fetch('http://localhost:3001/users/me', {
       headers: { Authorization: `Bearer ${token}` },
     })
-    user.value = res
   } catch (err) {
     console.error('Lỗi tải thông tin user:', err)
   }
 })
 
-const editField = (field) => {
-  alert(`Chức năng chỉnh sửa ${field} sẽ được thêm sau.`)
+// Cập nhật tên
+const updateName = async () => {
+  if (!newName.value.trim()) return alert('Vui lòng nhập tên mới!')
+  const token = localStorage.getItem('jwt')
+  try {
+    await $fetch('http://localhost:3001/users/update-name', {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: { name: newName.value },
+    })
+    user.value.name = newName.value
+    newName.value = ''
+    showEditName.value = false
+    alert('✅ Cập nhật tên thành công!')
+  } catch {
+    alert('❌ Lỗi cập nhật tên!')
+  }
+}
+
+// Cập nhật mật khẩu
+const updatePassword = async () => {
+  if (!oldPassword.value || !newPassword.value || !confirmPassword.value)
+    return alert('Vui lòng nhập đầy đủ thông tin!')
+  if (newPassword.value !== confirmPassword.value)
+    return alert('Mật khẩu xác nhận không khớp!')
+  const token = localStorage.getItem('jwt')
+  try {
+    await $fetch('http://localhost:3001/users/update-password', {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: { oldPassword: oldPassword.value, newPassword: newPassword.value },
+    })
+    showEditPassword.value = false
+    oldPassword.value = ''
+    newPassword.value = ''
+    confirmPassword.value = ''
+    alert('✅ Đổi mật khẩu thành công!')
+  } catch {
+    alert('❌ Sai mật khẩu cũ hoặc lỗi server!')
+  }
 }
 </script>
+
+<style scoped>
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+</style>

@@ -16,20 +16,6 @@
             class="w-full border border-gray-300 rounded-full py-2 px-4 pl-10 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent"
             @input="handleSearch"
           />
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            class="h-5 w-5 text-gray-400 absolute left-3 top-2.5"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M21 21l-4.35-4.35m0 0A7.5 7.5 0 1016.65 16.65z"
-            />
-          </svg>
 
           <!-- Dropdown kết quả tìm kiếm -->
           <div
@@ -151,7 +137,8 @@ onMounted(async () => {
   }
 })
 
-const handleSearch = async () => {
+// ✅ Hàm tìm kiếm có debounce (gọi API trực tiếp)
+const handleSearch = () => {
   clearTimeout(timeout)
   if (!search.value.trim()) {
     searchResults.value = []
@@ -160,12 +147,10 @@ const handleSearch = async () => {
 
   timeout = setTimeout(async () => {
     try {
-      const res = await $fetch(
-        `http://localhost:3001/items?search=${encodeURIComponent(search.value)}`
-      )
-      searchResults.value = res
+      const res = await $fetch(`http://localhost:3001/items/search/by-name?name=${encodeURIComponent(search.value)}`)
+      searchResults.value = Array.isArray(res) ? res : []
     } catch (err) {
-      console.error('Lỗi khi tìm kiếm:', err)
+      console.error('❌ Lỗi khi tìm kiếm item:', err)
       searchResults.value = []
     }
   }, 300)
@@ -187,7 +172,7 @@ const shortWallet = (addr) =>
 const goToItem = (id) => {
   search.value = ''
   searchResults.value = []
-  router.push(`/User/item/${id}`)
+  router.push(`/auction/contractAddress`)
 }
 
 const goToProfile = () => {
@@ -205,8 +190,8 @@ const logout = () => {
 const formatPrice = (price) => {
   if (!price) return '—'
   return `${Number(price).toLocaleString('en-US', {
-    minimumFractionDigits: 4,
-    maximumFractionDigits: 4,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   })} ETH`
 }
 </script>
