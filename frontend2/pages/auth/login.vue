@@ -200,80 +200,77 @@
 </template>
 
 <script setup>
-import { ref } from "vue";
-import { useRouter } from "vue-router";
+import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
+import { useCsrf } from '~/composables/useCsrf'
 
-const email = ref("");
-const password = ref("");
-const showPassword = ref(false);
-const rememberMe = ref(false);
-const loading = ref(false);
-const router = useRouter();
+const email = ref('')
+const password = ref('')
+const showPassword = ref(false)
+const rememberMe = ref(false)
+const loading = ref(false)
+const router = useRouter()
+
+// 🛡️ Lấy token CSRF từ composable
+const { csrfToken, fetchCsrf } = useCsrf()
 
 const handleLogin = async () => {
-  loading.value = true;
+  loading.value = true
 
   try {
-    // 1️⃣ Lấy CSRF token từ backend
-    const csrfRes = await $fetch("http://localhost:3001/auth/csrf-token", {
-      credentials: "include", // Cho phép cookie _csrf được set
-    });
-    const csrfToken = csrfRes.csrfToken;
+    // 🔁 Nếu token chưa có (VD: user reload F5 trang login), thì fetch lại
+    if (!csrfToken.value) {
+      await fetchCsrf()
+    }
 
-    // 2️⃣ Gửi request login kèm token
-    const res = await $fetch("http://localhost:3001/auth/login", {
-      method: "POST",
-      credentials: "include", // Bắt buộc có để gửi cookie
+    // 🚀 Gửi request login
+    const res = await $fetch('http://localhost:3001/auth/login', {
+      method: 'POST',
+      credentials: 'include', // để gửi cookie _csrf
       headers: {
-        "Content-Type": "application/json",
-        "X-CSRF-Token": csrfToken,
+        'Content-Type': 'application/json',
+        'X-CSRF-Token': csrfToken.value, // token CSRF ở đây
       },
       body: {
         email: email.value,
         password: password.value,
       },
-    });
+    })
 
-    const token = res?.access_token || res?.token;
-
+    const token = res?.access_token || res?.token
     if (token) {
-      localStorage.setItem("jwt", token);
+      localStorage.setItem('jwt', token)
 
       if (rememberMe.value) {
-        localStorage.setItem("rememberMe", "true");
-        localStorage.setItem("userEmail", email.value);
+        localStorage.setItem('rememberMe', 'true')
+        localStorage.setItem('userEmail', email.value)
       }
 
-      alert("✅ Đăng nhập thành công!");
+      alert('✅ Đăng nhập thành công!')
 
-      const user = res?.user;
-      if (user?.role === "Admin") {
-        router.push("/admin");
-      } else {
-        router.push("/auction");
-      }
+      const user = res?.user
+      if (user?.role === 'Admin') router.push('/admin')
+      else router.push('/auction')
     } else {
-      throw new Error("Không nhận được token từ server");
+      throw new Error('Không nhận được token từ server')
     }
   } catch (err) {
-    console.error("Login error:", err);
-    const errorMessage =
-      err?.data?.message || err?.message || "Đăng nhập thất bại";
-    alert("❌ " + errorMessage);
+    console.error('Login error:', err)
+    const msg = err?.data?.message || err?.message || 'Đăng nhập thất bại'
+    alert('❌ ' + msg)
   } finally {
-    loading.value = false;
+    loading.value = false
   }
-};
+}
 
-
-// Auto-fill if remembered
+// Auto-fill nếu rememberMe bật
 onMounted(() => {
-  const remembered = localStorage.getItem("rememberMe");
-  if (remembered === "true") {
-    email.value = localStorage.getItem("userEmail") || "";
-    rememberMe.value = true;
+  const remembered = localStorage.getItem('rememberMe')
+  if (remembered === 'true') {
+    email.value = localStorage.getItem('userEmail') || ''
+    rememberMe.value = true
   }
-});
+})
 </script>
 
 <style scoped>

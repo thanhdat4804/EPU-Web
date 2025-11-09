@@ -156,7 +156,7 @@
 import { ref, onMounted } from 'vue'
 import Header from '~/components/User/Header.vue'
 import { User, Home, Lock, Bell, CreditCard } from 'lucide-vue-next'
-
+import { useCsrf } from '~/composables/useCsrf'
 const user = ref(null)
 const currentTab = ref('account')
 
@@ -167,7 +167,7 @@ const newName = ref('')
 const oldPassword = ref('')
 const newPassword = ref('')
 const confirmPassword = ref('')
-
+const { csrfToken, fetchCsrf } = useCsrf()
 const tabs = [
   { key: 'account', label: 'Tài khoản', icon: User },
   { key: 'addresses', label: 'Địa chỉ', icon: Home },
@@ -196,9 +196,11 @@ const updateName = async () => {
   try {
     await $fetch('http://localhost:3001/users/update-name', {
       method: 'PUT',
+      credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${token}`,
+        'X-CSRF-Token': csrfToken.value,
       },
       body: { name: newName.value },
     })
@@ -221,9 +223,11 @@ const updatePassword = async () => {
   try {
     await $fetch('http://localhost:3001/users/update-password', {
       method: 'PUT',
+      credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${token}`,
+        'X-CSRF-Token': csrfToken.value,
       },
       body: { oldPassword: oldPassword.value, newPassword: newPassword.value },
     })
