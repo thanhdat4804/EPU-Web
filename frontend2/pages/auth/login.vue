@@ -214,8 +214,20 @@ const handleLogin = async () => {
   loading.value = true;
 
   try {
+    // 1️⃣ Lấy CSRF token từ backend
+    const csrfRes = await $fetch("http://localhost:3001/auth/csrf-token", {
+      credentials: "include", // Cho phép cookie _csrf được set
+    });
+    const csrfToken = csrfRes.csrfToken;
+
+    // 2️⃣ Gửi request login kèm token
     const res = await $fetch("http://localhost:3001/auth/login", {
       method: "POST",
+      credentials: "include", // Bắt buộc có để gửi cookie
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRF-Token": csrfToken,
+      },
       body: {
         email: email.value,
         password: password.value,
@@ -232,10 +244,8 @@ const handleLogin = async () => {
         localStorage.setItem("userEmail", email.value);
       }
 
-      // Success notification (you can use a toast library)
       alert("✅ Đăng nhập thành công!");
 
-      // Redirect based on user role
       const user = res?.user;
       if (user?.role === "Admin") {
         router.push("/admin");
@@ -247,7 +257,6 @@ const handleLogin = async () => {
     }
   } catch (err) {
     console.error("Login error:", err);
-
     const errorMessage =
       err?.data?.message || err?.message || "Đăng nhập thất bại";
     alert("❌ " + errorMessage);
@@ -255,6 +264,7 @@ const handleLogin = async () => {
     loading.value = false;
   }
 };
+
 
 // Auto-fill if remembered
 onMounted(() => {
