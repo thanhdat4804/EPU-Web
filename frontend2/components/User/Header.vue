@@ -64,6 +64,26 @@
 
         <!-- Nếu đã đăng nhập -->
         <template v-else>
+          <!-- 🦊 Nếu chưa có ví -->
+          <button
+            v-if="!walletAddress"
+            @click="connectWallet"
+            :disabled="isConnecting"
+            class="bg-yellow-500 text-white px-4 py-2 rounded-full text-sm hover:bg-yellow-600 transition disabled:opacity-60"
+          >
+            <span v-if="!isConnecting">🔗 Kết nối ví MetaMask</span>
+            <span v-else>⏳ Đang kết nối...</span>
+          </button>
+
+          <!-- 🟢 Nếu đã có ví -->
+          <div
+            v-else
+            class="text-sm font-mono text-gray-600 bg-gray-100 px-3 py-1 rounded-full"
+          >
+            🦊 {{ shortWallet(walletAddress) }}
+          </div>
+
+          <!-- 👤 Hồ sơ & đăng xuất -->
           <div
             @click="goToProfile"
             class="flex items-center space-x-2 bg-gray-100 px-3 py-1 rounded-full cursor-pointer hover:bg-gray-200 transition"
@@ -86,12 +106,16 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { useWallet } from '~/composables/useWallet'
 
 const router = useRouter()
 const search = ref('')
 const searchResults = ref([])
 const user = ref(null)
 let timeout = null
+
+// 🦊 Wallet
+const { walletAddress, connectMetamask, fetchWallet, isConnecting } = useWallet()
 
 onMounted(async () => {
   const token = localStorage.getItem('jwt')
@@ -103,6 +127,9 @@ onMounted(async () => {
     })
     user.value = userData
     localStorage.setItem('user', JSON.stringify(userData))
+
+    // 🔹 Nếu user có ID -> kiểm tra xem ví đã liên kết chưa
+    await fetchWallet(userData.id)
   } catch (err) {
     console.error('Không thể tải thông tin user:', err)
     localStorage.removeItem('jwt')
@@ -129,6 +156,19 @@ const handleSearch = () => {
   }, 300)
 }
 
+// 🦊 Kết nối MetaMask
+const connectWallet = async () => {
+  if (!user.value) {
+    alert('Vui lòng đăng nhập trước khi liên kết ví!')
+    return
+  }
+  await connectMetamask(user.value.id)
+}
+
+// ✂️ Rút gọn địa chỉ ví
+const shortWallet = (addr) =>
+  addr ? `${addr.slice(0, 6)}...${addr.slice(-4)}` : ''
+
 const goToItem = (id) => {
   search.value = ''
   searchResults.value = []
@@ -143,6 +183,7 @@ const logout = () => {
   localStorage.removeItem('jwt')
   localStorage.removeItem('user')
   user.value = null
+  walletAddress.value = null
   window.location.reload()
 }
 

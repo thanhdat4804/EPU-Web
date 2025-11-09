@@ -106,14 +106,14 @@ contract Action {
         require(ended, "Auction not ended");
         require(msg.sender == highestBidder, "Only winner can pay");
         require(!isPaidToSeller, "Already paid");
-        require(!isPenalized, "Winner has been penalized and cannot pay now"); // ✅ CHẶN !!!
+        require(!isPenalized, "Winner has been penalized");
 
         uint deposit = bids[msg.sender].deposit;
         uint remaining = highestBid - deposit;
         require(msg.value == remaining, "Must pay remaining balance");
 
+        // CHỈ ĐÁNH DẤU ĐÃ THANH TOÁN, KHÔNG CHUYỂN TIỀN
         isPaidToSeller = true;
-        payable(seller).transfer(highestBid);
 
         emit PaymentMade(msg.sender, highestBid);
     }
@@ -121,11 +121,10 @@ contract Action {
 
     function confirmReceived() external {
         require(msg.sender == highestBidder, "Only buyer can confirm");
+        require(isPaidToSeller, "Payment not completed"); // BẮT BUỘC ĐÃ PAY
         require(!isDisputed, "Disputed transaction");
-        require(!isPaidToSeller, "Already paid");
 
-        // 💸 Bây giờ mới chuyển tiền cho seller
-        isPaidToSeller = true;
+        // CHUYỂN TOÀN BỘ TIỀN (deposit + remaining) CHO SELLER
         payable(seller).transfer(highestBid);
 
         emit ItemReceived(highestBidder, highestBid);

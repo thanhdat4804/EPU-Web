@@ -13,6 +13,7 @@ export class TransactionService {
     toAddress: string;
     amount: number;
     auctionId?: number;
+    type: string;
   }) {
     return this.prisma.transaction.create({
       data: {
@@ -20,7 +21,8 @@ export class TransactionService {
         fromAddress: data.fromAddress,
         toAddress: data.toAddress,
         amount: data.amount,
-        auctionId: data.auctionId,
+        auctionId: data.auctionId ?? null,  // ← SỬA DÒNG NÀY
+        type: data.type,
       },
     });
   }
