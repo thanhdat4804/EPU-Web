@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
+import { CreateItemDto } from './dto/create-item.dto'
 
 @Injectable()
 export class ItemService {
@@ -55,4 +56,27 @@ export class ItemService {
 
     return items;
   }
+
+  async create(dto: CreateItemDto) {
+    try {
+      const item = await this.prisma.item.create({
+        data: {
+          name: dto.name,
+          description: dto.description,
+          imageUrl: dto.imageUrl,
+          startingPrice: dto.startingPrice,
+          // ⚠️ Bạn có thể cần thêm ownerId tạm thời nếu quan hệ yêu cầu
+          ownerId: 1, // gán user test tạm
+        },
+      })
+      return item
+    } catch (err) {
+      console.error('❌ Lỗi khi tạo item:', err)
+      throw err
+    }
+  }
+  async findAll() {
+    return this.prisma.item.findMany()
+  }
+  
 }
