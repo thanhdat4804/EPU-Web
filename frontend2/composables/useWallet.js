@@ -1,11 +1,11 @@
 import { ref } from 'vue'
 import { ethers } from 'ethers'
-
+import { useCsrf } from '~/composables/useCsrf'
 export const useWallet = () => {
   // dùng useState để đồng bộ giữa các trang
   const walletAddress = useState('walletAddress', () => null)
   const isConnecting = ref(false)
-
+  const { csrfToken, fetchCsrf } = useCsrf()
   // 🟢 Kết nối Metamask
   const connectMetamask = async (userId) => {
     try {
@@ -30,7 +30,11 @@ export const useWallet = () => {
       // Gọi API backend để liên kết ví với user
       await $fetch('http://localhost:3001/wallet/connect', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        headers: { 
+          'Content-Type': 'application/json',
+          'X-CSRF-Token': csrfToken.value, 
+        },
         body: JSON.stringify({ userId, wallet: address }), // ✅ thêm JSON.stringify để tránh lỗi body object
       })
 

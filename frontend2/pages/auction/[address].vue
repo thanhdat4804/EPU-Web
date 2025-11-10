@@ -119,7 +119,7 @@
 
 <script setup lang="ts">
 import Header from '~/components/User/Header.vue'
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { ethers } from 'ethers'
 import { useAuctionApi } from '~/composables/useAuctionApi'
@@ -136,11 +136,53 @@ const countdown = ref({ DAYS: '00', HOURS: '00', MINUTES: '00', SECONDS: '00' })
 const progress = ref(0)
 let timer: any = null
 
+// SỬA: Dùng watch để tự động cập nhật khi auction thay đổi
+watch(
+  () => auction.value?.onchain?.endTime,
+  (newEndTime) => {
+    if (!newEndTime) return
+    console.log('Watch kích hoạt → endTime:', newEndTime)
+
+    // Dừng timer cũ
+    if (timer) clearInterval(timer)
+
+    // Cập nhật ngay
+    updateCountdown()
+
+    // Tạo timer mới
+    timer = setInterval(() => {
+      updateCountdown()
+    }, 1000)
+  },
+  { immediate: true }
+)
+
 const updateCountdown = () => {
+  console.log('updateCountdown chạy')
+
   if (!auction.value?.onchain?.endTime) return
-  const end = new Date(auction.value.onchain.endTime).getTime()
+
+  let endTimeMs: number
+
+  // SỬA: Kiểm tra kiểu dữ liệu
+  if (typeof auction.value.onchain.endTime === 'string') {
+    // Chuỗi ISO: 2025-11-10T07:32:33.000Z
+    endTimeMs = new Date(auction.value.onchain.endTime).getTime()
+  } else if (typeof auction.value.onchain.endTime === 'number') {
+    // Số giây: 1731226523
+    endTimeMs = auction.value.onchain.endTime * 1000
+  } else {
+    return
+  }
+
+  // Kiểm tra hợp lệ
+  if (isNaN(endTimeMs)) {
+    console.error('endTime không hợp lệ:', auction.value.onchain.endTime)
+    return
+  }
+
   const now = Date.now()
-  const remaining = Math.max(0, end - now)
+  const remaining = Math.max(0, endTimeMs - now)
 
   const days = Math.floor(remaining / (1000 * 60 * 60 * 24))
   const hours = Math.floor((remaining / (1000 * 60 * 60)) % 24)
@@ -154,24 +196,43 @@ const updateCountdown = () => {
     SECONDS: String(seconds).padStart(2, '0')
   }
 
-  progress.value = 100 - (remaining / (end - Date.now() + remaining)) * 100
+  // Tính progress
+  let startTimeMs: number
+  const startField = auction.value.onchain?.startTime || auction.value.createdAt
+
+  if (typeof startField === 'string') {
+    startTimeMs = new Date(startField).getTime()
+  } else if (typeof startField === 'number') {
+    startTimeMs = startField * 1000
+  } else {
+    startTimeMs = now
+  }
+
+  const total = endTimeMs - startTimeMs
+  progress.value = total > 0 ? Math.min(100, ((now - startTimeMs) / total) * 100) : 100
 }
 
 onMounted(async () => {
   try {
     const address = route.params.address as string
     auction.value = await getAuctionDetail(address)
+    console.log('Auction onchain info:', auction.value.onchain)
+    console.log("Onchain endTime:", auction.value.onchain.endTime)
+    console.log("Type:", typeof auction.value.onchain.endTime)
+
     bidders.value = await getAllBids(address)
-    updateCountdown()
-    timer = setInterval(updateCountdown, 1000)
+
+    // watch sẽ tự động chạy
   } catch (err) {
-    console.error('❌ Lỗi tải chi tiết:', err)
+    console.error('Lỗi tải chi tiết:', err)
   }
 })
 
-onUnmounted(() => timer && clearInterval(timer))
+onUnmounted(() => {
+  if (timer) clearInterval(timer)
+})
 
-// 🪙 Đặt giá qua MetaMask
+// Đặt giá
 const placeBidAction = async () => {
   const token = localStorage.getItem('jwt')
   if (!token) return alert('Bạn cần đăng nhập để đặt giá.')
@@ -183,28 +244,24 @@ const placeBidAction = async () => {
     const provider = new ethers.providers.Web3Provider(window.ethereum)
     await provider.send('eth_requestAccounts', [])
     const signer = provider.getSigner()
-    const userAddress = await signer.getAddress()
     const contractAddress = route.params.address as string
 
     const abi = ['function placeBid(uint _amount) payable']
     const contract = new ethers.Contract(contractAddress, abi, signer)
 
-    // deposit 10% (giả định)
     const deposit = bidAmount.value * 0.1
     const tx = await contract.placeBid(ethers.utils.parseEther(bidAmount.value.toString()), {
       value: ethers.utils.parseEther(deposit.toString())
     })
 
-    alert('⏳ Giao dịch đang xử lý, vui lòng chờ xác nhận...')
+    alert('Giao dịch đang xử lý...')
     await tx.wait()
 
-    // ✅ Ghi nhận lại DB sau khi on-chain xong
     await recordBid(contractAddress, bidAmount.value, tx.hash)
-
     auction.value = await getAuctionDetail(contractAddress)
     bidders.value = await getAllBids(contractAddress)
     bidAmount.value = 0
-    alert(`✅ Đặt giá thành công! TxHash: ${tx.hash}`)
+    alert(`Đặt giá thành công! TxHash: ${tx.hash}`)
   } catch (err: any) {
     console.error(err)
     alert(err?.message || 'Đặt giá thất bại!')
@@ -213,6 +270,30 @@ const placeBidAction = async () => {
   }
 }
 
-const formatDate = (dateStr: string) => new Date(dateStr).toLocaleString('vi-VN')
+// SỬA: formatDate nhận số (giây)
+const formatDate = (dateInput: string | number) => {
+  let date: Date
+
+  if (typeof dateInput === 'string') {
+    date = new Date(dateInput)
+  } else if (typeof dateInput === 'number') {
+    date = new Date(dateInput * 1000)
+  } else {
+    return '—'
+  }
+
+  if (isNaN(date.getTime())) return 'Invalid Date'
+
+  return date.toLocaleString('vi-VN', {
+    timeZone: 'Asia/Ho_Chi_Minh',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit'
+  })
+}
+
 const formatEth = (val: number | string) => (val ? `${Number(val).toFixed(4)} ETH` : '—')
 </script>

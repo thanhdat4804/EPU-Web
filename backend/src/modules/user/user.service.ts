@@ -64,6 +64,7 @@ export class UserService {
               select: {
                 id: true,
                 name: true,
+                imageUrl: true,
                 startingPrice: true,
               },
             },

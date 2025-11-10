@@ -78,7 +78,20 @@
           </thead>
           <tbody class="bg-white divide-y divide-gray-200">
             <tr v-for="auction in user.auctions" :key="auction.id" class="hover:bg-gray-50">
-              <td class="px-6 py-4 whitespace-nowrap">{{ auction.item?.name || '—' }}</td>
+              <td class="px-6 py-4">
+                <div class="flex items-center gap-2">
+                  <!-- Ảnh vật phẩm (thật hoặc fallback) -->
+                  <img
+                    :src="auction.item?.imageUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(auction.item?.name || 'Item')}&background=random&color=fff`"
+                    class="w-12 h-12 rounded object-cover"
+                    alt="item"
+                  />
+                  <!-- Tên vật phẩm -->
+                  <span class="text-sm font-medium text-gray-900">
+                    {{ auction.item?.name || '—' }}
+                  </span>
+                </div>
+              </td>
               <td class="px-6 py-4 font-bold whitespace-nowrap">{{auction.item?.startingPrice}} ETH</td>
               <td class="px-6 py-4 whitespace-nowrap">
                 <span
