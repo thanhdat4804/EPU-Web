@@ -126,12 +126,12 @@ export class BlockchainService {
           create: {
             name: data.name,
             description: data.description,
-            imageUrl: data.imageUrl,
+            mainImage: data.mainImage,
+            subImages: data.subImages,
             startingPrice: data.startingPrice,
-            reservePrice: data.reservePrice,
+            reservePrice: data.reservePrice ?? null,
             ownerId: userId,
             status: 'pending',
-            categoryId: data.categoryId, // thêm category
           },
         },
         seller: { connect: { id: userId } },

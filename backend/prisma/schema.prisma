@@ -47,6 +47,10 @@ model Item {
   estimateMin    Float?
   estimateMax    Float?
 
+  // Image
+  mainImage      String?             // ảnh chính
+  subImages      String[] @default([]) // ảnh phụ (array)
+
   // 👤 Chủ sở hữu
   owner          User      @relation(fields: [ownerId], references: [id])
   ownerId        Int

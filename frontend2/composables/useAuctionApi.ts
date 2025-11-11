@@ -46,14 +46,22 @@ export function useAuctionApi() {
     })
   }
 
-  const createAuction = async (auctionData: any) => {
+  const createAuction = async (formData: FormData) => {
     const jwt = getJwt()
     if (!jwt) throw new Error('User not logged in')
+
+    const headers: Record<string, string> = {
+      Authorization: `Bearer ${jwt}`,
+    }
+
+    const csrf = $csrfToken()
+    if (csrf) headers['X-CSRF-Token'] = csrf
+
     return await $fetch(`${API_BASE}/create`, {
       method: 'POST',
       credentials: 'include',
-      headers: getHeaders(),
-      body: auctionData,
+      headers,
+      body: formData,
     })
   }
 
