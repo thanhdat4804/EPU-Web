@@ -105,10 +105,11 @@ export class BlockchainService {
   // ============================================================
 
   async createAuction(data: any, userId: number) {
+    // Lấy thông tin seller
     const seller = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!seller?.wallet) throw new NotFoundException('User wallet not found');
 
-    // Kiểm tra contract có tồn tại không (tùy chọn)
+    // Kiểm tra contract có tồn tại không
     try {
       const code = await this.provider.getCode(data.contractAddress);
       if (code === '0x') throw new Error('Contract not deployed');
@@ -117,7 +118,7 @@ export class BlockchainService {
     }
 
     const startTime = new Date();
-    const endTime = new Date(startTime.getTime() + data.duration * 1000);
+    const endTime = new Date(startTime.getTime() + data.duration * 1000); // duration từ frontend
 
     return this.prisma.auction.create({
       data: {
@@ -130,6 +131,7 @@ export class BlockchainService {
             reservePrice: data.reservePrice,
             ownerId: userId,
             status: 'pending',
+            categoryId: data.categoryId, // thêm category
           },
         },
         seller: { connect: { id: userId } },
@@ -141,6 +143,7 @@ export class BlockchainService {
       include: { item: true, seller: true },
     });
   }
+
 
   @Cron(CronExpression.EVERY_MINUTE)
   async autoFinalizeAuctions() {

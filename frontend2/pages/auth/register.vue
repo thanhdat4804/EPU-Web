@@ -340,11 +340,12 @@
 </template>
 
 <script setup>
-import { ref, computed } from "vue";
+import { ref, computed, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import { useCsrf } from '~/composables/useCsrf'
 
 const { csrfToken, fetchCsrf } = useCsrf()
+
 const name = ref("");
 const email = ref("");
 const password = ref("");
@@ -357,6 +358,18 @@ const emailError = ref("");
 const passwordMismatch = ref(false);
 const passwordStrength = ref(0);
 const router = useRouter();
+
+// Lấy CSRF token khi component mount (nếu chưa có)
+onMounted(async () => {
+  try {
+    if (!csrfToken.value) {
+      await fetchCsrf();
+    }
+  } catch (err) {
+    // Không block UI nếu fetch token thất bại, component vẫn cho phép thử
+    console.warn('Không lấy được CSRF token lúc mount:', err);
+  }
+});
 
 // Validate email format
 const validateEmail = () => {
@@ -425,14 +438,24 @@ const handleRegister = async () => {
   loading.value = true;
 
   try {
+    // Nếu chưa có token thì fetch lại
+    if (!csrfToken.value) {
+      await fetchCsrf();
+    }
+
+    // Sau khi có token, gửi POST kèm header X-CSRF-Token và credentials: 'include'
     const res = await $fetch("http://localhost:3001/auth/register", {
       method: "POST",
-      credentials: 'include', 
+      credentials: 'include', // bắt buộc để gửi cookie _csrf (và cookie session nếu dùng)
+      headers: {
+        "Content-Type": "application/json",
+        // chỉ thêm header khi có token
+        ...(csrfToken.value ? { "X-CSRF-Token": csrfToken.value } : {}),
+      },
       body: {
         name: name.value,
         email: email.value,
         password: password.value,
-        'X-CSRF-Token': csrfToken.value, 
       },
     });
 
@@ -448,6 +471,7 @@ const handleRegister = async () => {
   }
 };
 </script>
+
 
 <style scoped>
 /* Smooth animations */

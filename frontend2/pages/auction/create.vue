@@ -1,153 +1,247 @@
 <template>
-  <div class="max-w-2xl mx-auto p-8">
-    <h1 class="text-2xl font-bold mb-6">🧾 Tạo đấu giá mới</h1>
+  <div class="min-h-screen bg-gradient-to-br from-blue-50 via-sky-50 to-white">
+    <!-- HEADER -->
+    <Header />
 
-    <form v-if="!isCreating" @submit.prevent="onSubmit" class="space-y-4">
-      <!-- Tên đấu giá -->
-      <div>
-        <label class="block text-sm font-medium mb-1">Tên đấu giá</label>
-        <input
-          v-model="name"
-          class="border p-2 rounded w-full"
-          placeholder="Nhập tên đấu giá"
-          required
-        />
+    <!-- FORM TẠO ĐẤU GIÁ -->
+    <div class="max-w-4xl mx-auto p-6 mt-12">
+      <div class="bg-white/95 backdrop-blur-xl shadow-2xl rounded-3xl border border-blue-100/50 overflow-hidden">
+        <!-- Header Form - XANH ĐẬM -->
+        <div class="bg-gradient-to-r from-blue-600 to-cyan-600 p-6 text-white">
+          <h2 class="text-3xl font-bold flex items-center gap-3">
+            <span class="text-4xl">Tạo đấu giá</span>
+          </h2>
+          <p class="mt-1 text-blue-100">Đưa vật phẩm của bạn lên sàn đấu giá phi tập trung</p>
+        </div>
+
+        <!-- FORM -->
+        <form v-if="!isCreating" @submit.prevent="onSubmit" class="p-8 space-y-7">
+          <!-- Tên đấu giá -->
+          <div class="group">
+            <label class="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+              <span class="text-blue-600">Tên đấu giá</span> 
+            </label>
+            <input
+              v-model="name"
+              class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-blue-50/30 placeholder-gray-400 text-gray-900 font-medium"
+              placeholder=""
+              required
+            />
+          </div>
+
+          <!-- Mô tả -->
+          <div class="group">
+            <label class="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+              <span class="text-cyan-600">Mô tả</span> 
+            </label>
+            <textarea
+              v-model="description"
+              rows="3"
+              class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all duration-200 bg-blue-50/20 placeholder-gray-400 resize-none"
+              placeholder="Mô tả chi tiết về tình trạng, phụ kiện, nguồn gốc..."
+            ></textarea>
+          </div>
+
+          <!-- Ảnh + Preview -->
+          <div class="group">
+            <label class="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+              <span class="text-teal-600">Ảnh (URL)</span>
+            </label>
+            <input
+              v-model="imageUrl"
+              type="url"
+              class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all duration-200 bg-blue-50/20 placeholder-gray-400"
+              placeholder="https://example.com/item.jpg"
+            />
+            <!-- Preview ảnh -->
+            <div v-if="imageUrl" class="mt-4">
+              <div class="relative inline-block">
+                <img
+                  :src="imageUrl"
+                  alt="Preview"
+                  class="w-full max-w-md h-64 object-cover rounded-2xl shadow-lg border border-blue-100 transition-transform hover:scale-[1.02] duration-300"
+                  @load="imageLoading = false"
+                  @error="imageError = true"
+                  v-show="!imageLoading && !imageError"
+                />
+                <!-- Loading -->
+                <div
+                  v-if="imageLoading"
+                  class="w-full max-w-md h-64 bg-blue-50 border-2 border-dashed border-blue-200 rounded-2xl animate-pulse flex items-center justify-center"
+                >
+                  <span class="text-blue-600 font-medium">Đang tải ảnh...</span>
+                </div>
+                <!-- Error -->
+                <div
+                  v-if="imageError"
+                  class="w-full max-w-md h-64 bg-blue-50 border-2 border-blue-200 rounded-2xl flex flex-col items-center justify-center text-blue-700"
+                >
+                  <span class="text-5xl">Không tải được</span>
+                  <p class="mt-2 font-medium">Ảnh không hợp lệ</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Thể loại -->
+          <div class="group">
+            <label class="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+              <span class="text-sky-600">Thể loại</span> 
+            </label>
+            <select
+              v-model="categoryId"
+              class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-sky-500 focus:border-transparent transition-all duration-200 bg-blue-50/20 text-gray-900 font-medium"
+              required
+            >
+              <option value="" disabled>-- Chọn thể loại --</option>
+              <option
+                v-for="category in categories"
+                :key="category.id"
+                :value="category.id"
+              >
+                {{ category.name }}
+              </option>
+            </select>
+          </div>
+
+          <!-- Giá khởi điểm + Giá sàn -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="group">
+              <label class="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                <span class="text-emerald-600">Giá khởi điểm (ETH)</span> 
+              </label>
+              <input
+                v-model.number="startingPrice"
+                type="number"
+                step="0.001"
+                min="0"
+                class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all duration-200 bg-emerald-50/30 placeholder-gray-400 font-bold text-emerald-900"
+                placeholder="0.05"
+                required
+              />
+            </div>
+            <div class="group">
+              <label class="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                <span class="text-indigo-600">Giá sàn (ETH)</span> 
+              </label>
+              <input
+                v-model.number="reservePrice"
+                type="number"
+                step="0.001"
+                min="0"
+                class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200 bg-indigo-50/30 placeholder-gray-400"
+                placeholder="0.1"
+              />
+            </div>
+          </div>
+
+          <!-- Thời gian đấu giá -->
+          <div class="group">
+            <label class="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+              <span class="text-cyan-600">Thời gian đấu giá (giây)</span>
+            </label>
+            <input
+              v-model.number="biddingTime"
+              type="number"
+              min="30"
+              class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all duration-200 bg-cyan-50/30 placeholder-gray-400"
+              placeholder="86400"
+              required
+            />
+            <p class="mt-1 text-xs text-blue-600">Tối thiểu 30 giây. Gợi ý: 86400 (1 ngày)</p>
+          </div>
+
+          <!-- Nút tạo - XANH ĐẬM -->
+          <button
+            type="submit"
+            class="w-full mt-8 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white font-bold py-4 rounded-2xl shadow-lg transform transition-all duration-200 hover:scale-[1.02] active:scale-100 flex items-center justify-center gap-3 text-lg"
+          >
+            <span class="text-2xl">Tạo đấu giá</span>
+          </button>
+        </form>
+
+        <!-- LOADING -->
+        <div v-else class="p-16 text-center">
+          <div class="relative inline-block">
+            <div class="animate-spin rounded-full h-20 w-20 border-4 border-blue-100"></div>
+            <div class="animate-spin rounded-full h-20 w-20 border-t-4 border-blue-600 absolute top-0 left-0"></div>
+          </div>
+          <p class="mt-6 text-xl font-semibold text-blue-700">Đang triển khai hợp đồng...</p>
+          <p class="mt-2 text-sm text-blue-600">Vui lòng chờ, giao dịch đang được xác nhận trên blockchain</p>
+        </div>
       </div>
-
-      <!-- Mô tả -->
-      <div>
-        <label class="block text-sm font-medium mb-1">Mô tả</label>
-        <textarea
-          v-model="description"
-          class="border p-2 rounded w-full"
-          rows="3"
-          placeholder="Mô tả ngắn về vật phẩm"
-        ></textarea>
-      </div>
-
-      <!-- Ảnh -->
-      <div>
-        <label class="block text-sm font-medium mb-1">Ảnh (URL)</label>
-        <input
-          v-model="imageUrl"
-          type="url"
-          class="border p-2 rounded w-full"
-          placeholder="https://example.com/item.jpg"
-        />
-      </div>
-
-      <!-- Giá khởi điểm -->
-      <div>
-        <label class="block text-sm font-medium mb-1">Giá khởi điểm (ETH)</label>
-        <input
-          v-model.number="startingPrice"
-          type="number"
-          step="0.01"
-          min="0"
-          class="border p-2 rounded w-full"
-          placeholder="Nhập giá khởi điểm"
-          required
-        />
-      </div>
-
-      <!-- Giá sàn -->
-      <div>
-        <label class="block text-sm font-medium mb-1">Giá sàn (ETH)</label>
-        <input
-          v-model.number="reservePrice"
-          type="number"
-          step="0.01"
-          min="0"
-          class="border p-2 rounded w-full"
-          placeholder="Tùy chọn"
-        />
-      </div>
-
-      <!-- Thời gian đấu giá -->
-      <div>
-        <label class="block text-sm font-medium mb-1">Thời gian đấu giá (giây)</label>
-        <input
-          v-model.number="biddingTime"
-          type="number"
-          min="30"
-          class="border p-2 rounded w-full"
-          required
-        />
-      </div>
-
-      <!-- Nút tạo -->
-      <button
-        type="submit"
-        class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-      >
-        Tạo đấu giá
-      </button>
-    </form>
-
-    <div v-else class="text-green-600 font-semibold text-center mt-6">
-      ⏳ Đang tạo đấu giá, vui lòng chờ...
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { ethers } from 'ethers'
 import { useRouter } from '#app'
 import { useAuctionApi } from '~/composables/useAuctionApi'
+import Header from '~/components/User/Header.vue'
 
 const name = ref('')
 const description = ref('')
 const imageUrl = ref('')
 const startingPrice = ref(0)
 const reservePrice = ref<number | null>(null)
-const biddingTime = ref(60)
+const biddingTime = ref(86400)
+const categoryId = ref<number | null>(null)
+const categories = ref<{ id: number; name: string }[]>([])
 const isCreating = ref(false)
+const imageLoading = ref(false)
+const imageError = ref(false)
+
 const router = useRouter()
 const { createAuction } = useAuctionApi()
+
+watch(imageUrl, () => {
+  imageLoading.value = true
+  imageError.value = false
+})
+
+onMounted(async () => {
+  try {
+    const res = await fetch('http://localhost:3001/categories')
+    if (!res.ok) throw new Error('Không thể tải danh sách thể loại')
+    categories.value = await res.json()
+  } catch (err) {
+    console.error('Lỗi load categories:', err)
+  }
+})
 
 const onSubmit = async () => {
   try {
     if (!window.ethereum) return alert('Vui lòng cài đặt MetaMask!')
     const token = localStorage.getItem('jwt')
     if (!token) return alert('Bạn cần đăng nhập trước.')
+    if (!categoryId.value) return alert('Vui lòng chọn thể loại!')
 
     isCreating.value = true
 
-    // === GIAI ĐOẠN 1: DEPLOY CONTRACT QUA METAMASK ===
     const provider = new ethers.providers.Web3Provider(window.ethereum)
     await provider.send('eth_requestAccounts', [])
     const signer = provider.getSigner()
-    const userAddress = await signer.getAddress() // ← ĐÚNG: address string
+    const userAddress = await signer.getAddress()
 
-    // ĐÚNG: ABI + ADDRESS
     const factoryAddress = '0x5FbDB2315678afecb367f032d93F642f64180aa3'
     const factoryABI = [
       'function createAction(uint256 _biddingTime, address _seller) external',
-      'function getAllActions() external view returns (address[] memory)',
-      'event ActionCreated(address indexed seller, address actionAddress, uint endTime)' // ← ĐÚNG
+      'event ActionCreated(address indexed seller, address actionAddress, uint endTime)'
     ]
 
     const factory = new ethers.Contract(factoryAddress, factoryABI, signer)
+    const tx = await factory.createAction(biddingTime.value, userAddress, { gasLimit: 5000000 })
 
-    // ĐÚNG: GỌI createAction(biddingTime, seller)
-    const tx = await factory.createAction(
-      biddingTime.value,        // ← uint256 (giây)
-      userAddress,              // ← address
-      { gasLimit: 5000000 }     // ← BẮT BUỘC
-    )
+    alert('Đang tạo hợp đồng trên blockchain...')
 
-    alert('Đang tạo đấu giá trên blockchain...')
     const receipt = await tx.wait()
-
-    // ĐÚNG: LẤY ĐỊA CHỈ TỪ EVENT
     const event = receipt.events?.find(e => e.event === 'ActionCreated')
-    if (!event?.args?.actionAddress) throw new Error('Không tìm thấy địa chỉ mới!')
+    if (!event?.args?.actionAddress) throw new Error('Không tìm thấy địa chỉ hợp đồng!')
+
     const contractAddress = event.args.actionAddress
 
-    console.log('Auction created at:', contractAddress)
-
-    // === GIAI ĐOẠN 2: LƯU VÀO DB ===
     const auctionData = {
       contractAddress,
       name: name.value,
@@ -155,17 +249,18 @@ const onSubmit = async () => {
       imageUrl: imageUrl.value,
       startingPrice: startingPrice.value,
       reservePrice: reservePrice.value ?? undefined,
-      duration: biddingTime.value
+      duration: biddingTime.value,
+      categoryId: categoryId.value
     }
 
     const result = await createAuction(auctionData)
+
     if (result?.contractAddress) {
       alert('Tạo đấu giá thành công!')
       router.push(`/auction/${result.contractAddress}`)
     } else {
-      alert('Lỗi: Không nhận được kết quả từ server')
+      throw new Error('Không nhận được phản hồi từ server')
     }
-
   } catch (err: any) {
     console.error('Lỗi:', err)
     alert(`Tạo đấu giá thất bại: ${err.message || 'Lỗi không xác định'}`)
@@ -174,3 +269,9 @@ const onSubmit = async () => {
   }
 }
 </script>
+
+<style scoped>
+.group:focus-within label {
+  color: #2563eb;
+}
+</style>
