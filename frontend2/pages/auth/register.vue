@@ -342,7 +342,9 @@
 <script setup>
 import { ref, computed } from "vue";
 import { useRouter } from "vue-router";
+import { useCsrf } from '~/composables/useCsrf'
 
+const { csrfToken, fetchCsrf } = useCsrf()
 const name = ref("");
 const email = ref("");
 const password = ref("");
@@ -425,10 +427,12 @@ const handleRegister = async () => {
   try {
     const res = await $fetch("http://localhost:3001/auth/register", {
       method: "POST",
+      credentials: 'include', 
       body: {
         name: name.value,
         email: email.value,
         password: password.value,
+        'X-CSRF-Token': csrfToken.value, 
       },
     });
 
