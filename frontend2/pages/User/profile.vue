@@ -155,7 +155,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import Header from '~/components/User/Header.vue'
-import { User, Home, Lock, Bell, CreditCard } from 'lucide-vue-next'
+import { User, Home, Lock, Bell, History } from 'lucide-vue-next'
 import { useCsrf } from '~/composables/useCsrf'
 const user = ref(null)
 const currentTab = ref('account')
@@ -171,9 +171,8 @@ const { csrfToken, fetchCsrf } = useCsrf()
 const tabs = [
   { key: 'account', label: 'Tài khoản', icon: User },
   { key: 'addresses', label: 'Địa chỉ', icon: Home },
-  { key: 'payment', label: 'Thanh toán', icon: CreditCard },
   { key: 'notifications', label: 'Thông báo', icon: Bell },
-  { key: 'verification', label: 'Xác minh', icon: Lock },
+  { key: 'history', label: 'Lịch sử đấu giá', icon: History },
 ]
 
 // Lấy user
