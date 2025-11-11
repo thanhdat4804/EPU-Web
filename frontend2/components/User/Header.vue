@@ -2,8 +2,19 @@
   <header class="bg-white shadow-sm sticky top-0 z-50">
     <div class="flex items-center justify-between px-8 py-4 relative">
       <!-- Logo -->
-      <NuxtLink to="/auction" class="text-2xl font-bold text-blue-600 select-none">
+      <NuxtLink
+        to="/auction"
+        class="text-2xl font-bold text-blue-600 select-none"
+      >
         BidDora
+      </NuxtLink>
+
+      <!-- 🧿 Nút "Đấu giá nào" luôn hiển thị -->
+      <NuxtLink
+        to="/auction/create"
+        class="ml-6 flex items-center gap-2 bg-gradient-to-r from-blue-500 to-indigo-600 text-white px-5 py-2 rounded-full font-semibold text-sm shadow-md hover:shadow-lg hover:scale-[1.03] transition-all duration-300"
+      >
+        <span>Đấu giá nào</span>
       </NuxtLink>
 
       <!-- Thanh tìm kiếm -->
@@ -104,11 +115,12 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, onMounted, computed } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { useWallet } from '~/composables/useWallet'
 
 const router = useRouter()
+const route = useRoute()
 const search = ref('')
 const searchResults = ref([])
 const user = ref(null)
@@ -116,6 +128,14 @@ let timeout = null
 
 // 🦊 Wallet
 const { walletAddress, connectMetamask, fetchWallet, isConnecting } = useWallet()
+
+// ✅ Kiểm tra xem có đang ở trang tạo đấu giá không
+const isCreatePage = computed(() => route.path === '/auction/create')
+
+// 🔹 Điều hướng về danh sách đấu giá
+const goToAuctionList = () => {
+  router.push('/auction')
+}
 
 onMounted(async () => {
   const token = localStorage.getItem('jwt')
@@ -127,8 +147,6 @@ onMounted(async () => {
     })
     user.value = userData
     localStorage.setItem('user', JSON.stringify(userData))
-
-    // 🔹 Nếu user có ID -> kiểm tra xem ví đã liên kết chưa
     await fetchWallet(userData.id)
   } catch (err) {
     console.error('Không thể tải thông tin user:', err)
@@ -137,7 +155,7 @@ onMounted(async () => {
   }
 })
 
-// ✅ Hàm tìm kiếm có debounce (gọi API trực tiếp)
+// ✅ Tìm kiếm
 const handleSearch = () => {
   clearTimeout(timeout)
   if (!search.value.trim()) {
@@ -147,7 +165,11 @@ const handleSearch = () => {
 
   timeout = setTimeout(async () => {
     try {
-      const res = await $fetch(`http://localhost:3001/items/search/by-name?name=${encodeURIComponent(search.value)}`)
+      const res = await $fetch(
+        `http://localhost:3001/items/search/by-name?name=${encodeURIComponent(
+          search.value
+        )}`
+      )
       searchResults.value = Array.isArray(res) ? res : []
     } catch (err) {
       console.error('❌ Lỗi khi tìm kiếm item:', err)
@@ -156,7 +178,6 @@ const handleSearch = () => {
   }, 300)
 }
 
-// 🦊 Kết nối MetaMask
 const connectWallet = async () => {
   if (!user.value) {
     alert('Vui lòng đăng nhập trước khi liên kết ví!')
@@ -165,14 +186,13 @@ const connectWallet = async () => {
   await connectMetamask(user.value.id)
 }
 
-// ✂️ Rút gọn địa chỉ ví
 const shortWallet = (addr) =>
   addr ? `${addr.slice(0, 6)}...${addr.slice(-4)}` : ''
 
 const goToItem = (id) => {
   search.value = ''
   searchResults.value = []
-  router.push(`/auction/contractAddress`)
+  router.push(`/auction/${id}`)
 }
 
 const goToProfile = () => {
