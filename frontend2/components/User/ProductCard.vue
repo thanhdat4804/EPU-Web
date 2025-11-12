@@ -6,10 +6,11 @@
     <!-- Ảnh sản phẩm -->
     <div class="aspect-square bg-gray-50 flex items-center justify-center overflow-hidden relative">
       <img
-        :src="auction.item?.imageUrl || '/no-image.jpg'"
+        :src="getImageUrl(auction.item?.mainImage, auction.item?.imageUrl)"
         :alt="auction.item?.name"
         class="object-cover w-full h-full transition-transform duration-500 hover:scale-105"
       />
+
       <div
         v-if="auction.status === 'Active'"
         class="absolute top-2 right-2 bg-green-100 text-green-700 text-xs font-semibold px-2 py-1 rounded-lg shadow-sm"
@@ -47,7 +48,11 @@
 defineProps({
   auction: { type: Object, required: true },
 })
-
+const getImageUrl = (mainImage, imageUrl) => {
+  if (imageUrl) return imageUrl // nếu có link URL thì dùng luôn
+  if (mainImage) return `http://localhost:3001/uploads/${mainImage}` // ảnh upload từ máy
+  return '/no-image.jpg' // fallback
+}
 const formatPrice = (price) => {
   if (!price) return '—'
   return `${Number(price).toLocaleString('en-US', {
