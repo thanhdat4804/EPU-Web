@@ -11,6 +11,7 @@ import {
   BadRequestException,
   UsePipes,
   ValidationPipe,
+  Logger,
 } from '@nestjs/common';
 import { BlockchainService } from './blockchain.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -21,6 +22,7 @@ import * as fs from 'fs';
 import { CreateAuctionDto } from './dto/create-auction.dto';
 @Controller('auction')
 export class BlockchainController {
+  private readonly logger = new Logger(BlockchainController.name);
   constructor(private readonly blockchainService: BlockchainService) {}
 
   // 🟢 Lấy danh sách đấu giá
@@ -194,7 +196,16 @@ export class BlockchainController {
   // 🟢 Lấy danh sách đặt giá (on-chain)
   @Get(':address/bids')
   async getAllBids(@Param('address') address: string) {
-    return this.blockchainService.getAllBids(address);
+    try {
+      if (!/^0x[a-fA-F0-9]{40}$/.test(address)) {
+        return []; // Trả mảng rỗng nếu address sai
+      }
+      const bids = await this.blockchainService.getAllBids(address);
+      return bids; // Luôn trả mảng (có thể rỗng)
+    } catch (error: any) {
+      this.logger.warn(`getAllBids(${address}) failed: ${error.message}`);
+      return []; // QUAN TRỌNG: TRẢ [] THAY VÌ 500
+    }
   }
 
   // 🟢 Lấy danh sách đấu giá thắng của user (DB)

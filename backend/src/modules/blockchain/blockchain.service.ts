@@ -578,14 +578,28 @@ export class BlockchainService {
   }
 
   async getAllBids(address: string) {
+  try {
     const contract = new ethers.Contract(address, this.auctionABI, this.provider);
     const [bidders, amounts, deposits] = await contract.getAllBids();
-    return bidders.map((addr: string, i: number) => ({
-      bidder: addr,
-      amount: ethers.utils.formatEther(amounts[i]),
-      deposit: ethers.utils.formatEther(deposits[i]),
-    }));
+
+    return bidders
+      .map((addr: string, i: number) => ({
+        bidder: addr,
+        amount: ethers.utils.formatEther(amounts[i]),
+        deposit: ethers.utils.formatEther(deposits[i]),
+      }))
+      .filter(b => 
+        b.bidder !== ethers.constants.AddressZero && 
+        parseFloat(b.amount) > 0
+      );
+  } catch (error: any) {
+    if (error.code === 'CALL_EXCEPTION') {
+      this.logger.warn(`getAllBids() failed for ${address}: ${error.message}`);
+      return []; // TRẢ MẢNG RỖNG → FRONTEND HIỆN "Chưa có ai đấu giá"
+    }
+    throw error; // Các lỗi khác vẫn throw
   }
+}
 
   // ============================================================
   // Transaction verification

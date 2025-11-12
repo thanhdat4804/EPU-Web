@@ -60,27 +60,29 @@ contract Action {
         uint requiredDeposit = (_amount * DEPOSIT_RATE) / 100;
         Bid storage userBid = bids[msg.sender];
 
-        // ✅ Tính số tiền cần gửi thêm để đủ cọc 10% mới
+        // ✅ KIỂM TRA TRƯỚC KHI GÁN amount
+        bool isFirstBid = (userBid.amount == 0);
+
+        // ✅ Tính deposit
         uint additionalDeposit = 0;
         if (requiredDeposit > userBid.deposit) {
             additionalDeposit = requiredDeposit - userBid.deposit;
             require(msg.value >= additionalDeposit, "Not enough additional deposit");
             userBid.deposit += additionalDeposit;
         } else {
-            // Nếu deposit hiện tại đã đủ (do đã gửi dư từ trước)
             require(msg.value == 0, "No need to send more deposit");
         }
 
-        // ✅ Cập nhật thông tin bid
+        // ✅ GÁN amount SAU
         userBid.amount = _amount;
         userBid.refunded = false;
 
-        // ✅ Nếu đây là lần đầu đặt thì thêm vào danh sách bidders
-        if (bids[msg.sender].amount == 0) {
+        // ✅ PUSH VỚI ĐIỀU KIỆN ĐÃ LƯU
+        if (isFirstBid) {
             bidders.push(msg.sender);
         }
 
-        // ✅ Cập nhật người dẫn đầu
+        // ✅ Cập nhật highest
         highestBidder = msg.sender;
         highestBid = _amount;
 
@@ -197,14 +199,29 @@ contract Action {
      * @dev Lấy toàn bộ danh sách người đặt giá & số tiền họ đặt
      */
     function getAllBids() public view returns (address[] memory, uint[] memory, uint[] memory) {
-        uint[] memory amounts = new uint[](bidders.length);
-        uint[] memory deposits = new uint[](bidders.length);
-
+        uint validCount = 0;
         for (uint i = 0; i < bidders.length; i++) {
-            amounts[i] = bids[bidders[i]].amount;
-            deposits[i] = bids[bidders[i]].deposit;
+            if (bidders[i] != address(0) && bids[bidders[i]].amount > 0) {
+                validCount++;
+            }
         }
 
-        return (bidders, amounts, deposits);
+        address[] memory validBidders = new address[](validCount);
+        uint[] memory amounts = new uint[](validCount);
+        uint[] memory deposits = new uint[](validCount);
+
+        uint index = 0;
+        for (uint i = 0; i < bidders.length; i++) {
+            address bidder = bidders[i];
+            if (bidder == address(0)) continue;
+            if (bids[bidder].amount > 0) {
+                validBidders[index] = bidder;
+                amounts[index] = bids[bidder].amount;
+                deposits[index] = bids[bidder].deposit;
+                index++;
+            }
+        }
+
+        return (validBidders, amounts, deposits);
     }
 }
