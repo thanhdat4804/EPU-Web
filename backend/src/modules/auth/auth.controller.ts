@@ -1,34 +1,48 @@
-import { Controller, Post, Body, Get, Req } from '@nestjs/common'
+// src/modules/auth/auth.controller.ts
+import {
+  Controller,
+  Post,
+  Body,
+  Get,
+  HttpCode,
+  Req,
+  BadRequestException,
+} from '@nestjs/common'
 import { AuthService } from './auth.service'
-import type { Request } from 'express' // ✅ chỉ import type để tránh lỗi TS1272
+import { RegisterDto } from './dto/register.dto'
+import { LoginDto } from './dto/login.dto'
+import type { Request } from 'express'
 
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
+  // 🟢 ĐĂNG KÝ – DÙNG DTO + VALIDATION
   @Post('register')
-  register(
-    @Body('name') name: string,
-    @Body('email') email: string,
-    @Body('password') password: string,
-  ) {
-    return this.authService.register(name, email, password)
+  @HttpCode(201)
+  async register(@Body() registerDto: RegisterDto) {
+    // ValidationPipe sẽ tự validate → không cần kiểm tra thủ công
+    return this.authService.register(registerDto)
   }
 
+  // 🟢 ĐĂNG NHẬP – DÙNG DTO
   @Post('login')
-  login(@Body('email') email: string, @Body('password') password: string) {
-    return this.authService.login(email, password)
+  @HttpCode(200)
+  async login(@Body() loginDto: LoginDto) {
+    return this.authService.login(loginDto)
   }
 
-  // ✅ GET /auth/csrf-token — trả token cho frontend
+  // 🟢 LẤY CSRF TOKEN – CHO FRONTEND
   @Get('csrf-token')
   getCsrfToken(@Req() req: Request) {
+    // Kiểm tra csurf middleware token
     if (typeof req.csrfToken === 'function') {
       return { csrfToken: req.csrfToken() }
     }
-    return {
-      csrfToken: null,
-      message: 'CSRF token unavailable — please check csurf middleware setup',
-    }
+
+    // Nếu csurf chưa được cấu hình đúng
+    throw new BadRequestException(
+      'CSRF token không khả dụng — vui lòng kiểm tra middleware csurf trong main.ts',
+    )
   }
 }
