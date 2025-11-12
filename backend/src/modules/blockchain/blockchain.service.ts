@@ -3,7 +3,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { ethers } from 'ethers';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { Prisma } from '@prisma/client';
-
+import { CreateAuctionDto } from './dto/create-auction.dto';
 @Injectable()
 export class BlockchainService {
   private provider: ethers.providers.JsonRpcProvider;
@@ -104,47 +104,91 @@ export class BlockchainService {
   // ADMIN / SERVER-SIDE ACTIONS
   // ============================================================
 
-  async createAuction(data: any, userId: number) {
-    // Lấy thông tin seller
-    const seller = await this.prisma.user.findUnique({ where: { id: userId } });
-    if (!seller?.wallet) throw new NotFoundException('User wallet not found');
+  async createAuction(dto: CreateAuctionDto, userId: number) {
+    const {
+      name,
+      description,
+      imageUrl,
+      startingPrice,
+      reservePrice,
+      estimateMin,
+      estimateMax,
+      mainImage,
+      subImages = [],
+      categoryId,
+      duration,
+      contractAddress,
+    } = dto;
 
-    // Kiểm tra contract có tồn tại không
+    // === 1. KIỂM TRA USER + WALLET ===
+    const seller = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, wallet: true },
+    });
+
+    if (!seller) throw new NotFoundException('Người dùng không tồn tại');
+    if (!seller.wallet) throw new NotFoundException('Ví người dùng chưa được thiết lập');
+
+    // === 2. KIỂM TRA CONTRACT ===
     try {
-      const code = await this.provider.getCode(data.contractAddress);
-      if (code === '0x') throw new Error('Contract not deployed');
+      const code = await this.provider.getCode(contractAddress);
+      if (code === '0x' || code === '0x0') {
+        throw new BadRequestException('Hợp đồng chưa được triển khai');
+      }
     } catch {
-      throw new BadRequestException('Invalid contract address');
+      throw new BadRequestException('Địa chỉ hợp đồng không hợp lệ');
     }
 
+    // === 3. TÍNH THỜI GIAN ===
     const startTime = new Date();
-    const endTime = new Date(startTime.getTime() + data.duration * 1000); // duration từ frontend
+    const endTime = new Date(startTime.getTime() + duration * 1000);
 
+    // === 4. ownerId = userId (người tạo) ===
+    const ownerId = userId;
+
+    // === 5. TẠO AUCTION + ITEM ===
     return this.prisma.auction.create({
       data: {
-        item: {
-          create: {
-            name: data.name,
-            description: data.description,
-            mainImage: data.mainImage,
-            subImages: data.subImages,
-            startingPrice: data.startingPrice,
-            reservePrice: data.reservePrice ?? null,
-            ownerId: userId,
-            status: 'pending',
-          },
-        },
-        seller: { connect: { id: userId } },
-        contractAddress: data.contractAddress,
+        contractAddress,
         startTime,
         endTime,
         status: 'Active',
+        seller: { connect: { id: userId } },
+
+        item: {
+          create: {
+            name: name.trim(),
+            description: description?.trim() || null,
+            imageUrl: imageUrl || null,
+            startingPrice,
+            reservePrice: reservePrice ?? null,
+            estimateMin: estimateMin ?? null,
+            estimateMax: estimateMax ?? null,
+            mainImage,
+            subImages,
+            owner: { connect: { id: ownerId } },
+            // XÓA ownerId, DỌNG NÀY → LỖI TS2322
+            // ownerId, ← XÓA DÒNG NÀY
+            status: 'pending',
+            ...(categoryId !== undefined && {
+              category: { connect: { id: categoryId } },
+            }),
+          },
+        },
       },
-      include: { item: true, seller: true },
+      include: {
+        item: {
+          include: {
+            category: { select: { id: true, name: true } },
+            owner: { select: { id: true, name: true } },
+          },
+        },
+        seller: { select: { id: true, name: true, wallet: true } },
+      },
     });
   }
 
-
+  //Cron job tự động finalize auctions đã kết thúc
   @Cron(CronExpression.EVERY_MINUTE)
   async autoFinalizeAuctions() {
     const now = new Date();
