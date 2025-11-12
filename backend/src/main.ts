@@ -1,5 +1,5 @@
 import { NestFactory } from '@nestjs/core'
-import { ValidationPipe, Logger } from '@nestjs/common'
+import { ValidationPipe, Logger, BadRequestException, ValidationError } from '@nestjs/common'
 import cookieParser from 'cookie-parser'
 import csurf from 'csurf'
 import { Request, Response, NextFunction } from 'express'
@@ -81,8 +81,20 @@ async function bootstrap() {
       whitelist: true,
       forbidNonWhitelisted: true,
       transform: true,
-      disableErrorMessages: IS_PRODUCTION,
-      errorHttpStatusCode: 400,
+      exceptionFactory: (errors: ValidationError[]) => {
+        const result: Record<string, string[]> = {}
+
+        errors.forEach((err) => {
+          const field = err.property
+          const constraints = err.constraints
+
+          if (constraints && typeof constraints === 'object') {
+            result[field] = Object.values(constraints)
+          }
+        })
+
+        return new BadRequestException(result)
+      },
     }),
   )
 
