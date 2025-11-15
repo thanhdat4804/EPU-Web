@@ -30,9 +30,6 @@
       <h3 class="font-semibold text-gray-800 truncate text-sm sm:text-base">
         {{ auction.item?.name }}
       </h3>
-      <p class="text-xs text-gray-500 mt-1 line-clamp-2">
-        {{ auction.item?.description || 'Không có mô tả' }}
-      </p>
 
       <div class="mt-3 flex justify-between items-center">
         <span class="text-blue-600 font-bold flex items-center gap-1 text-sm sm:text-base">
