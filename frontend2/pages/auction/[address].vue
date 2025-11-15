@@ -8,7 +8,7 @@
       <div v-if="auction" class="max-w-7xl mx-auto grid md:grid-cols-2 gap-8 items-start">
         <!-- CỘT TRÁI: Thông tin vật phẩm + Ảnh -->
         <div class="space-y-6">
-          <div class="bg-white p-6 rounded-2xl shadow-md border border-gray-200">
+          <div class="bg-white p-6 rounded-none shadow-md border border-gray-200">
             <!-- ẢNH CHÍNH -->
             <div class="relative mb-4">
               <img
@@ -44,6 +44,12 @@
             <h1 class="text-3xl font-bold text-gray-800 mb-3">
               {{ auction.item?.name || 'Chi tiết đấu giá' }}
             </h1>
+            <div v-if="auction.item?.category?.name" class="mb-4">
+              <p class="font-semibold text-gray-800 mb-1">Thể loại:</p>
+              <p class="text-blue-600 font-medium text-lg">
+                {{ auction.item.category.name }}
+              </p>
+            </div>
             <div class="mb-4">
               <p class="font-semibold text-gray-800 mb-1">Mô tả:</p>
               <p class="text-gray-600 leading-relaxed">
@@ -66,7 +72,18 @@
                   {{ formatEth(auction.onchain?.highestBid || auction.item?.startingPrice) }}
                 </span>
               </p>
-              <p><b>Người giữ giá cao nhất:</b> {{ auction.onchain?.highestBidder || 'Chưa có' }}</p>
+              <p>
+                <b>Người giữ giá cao nhất:</b>
+                <span class="font-mono text-blue-600">
+                  {{ 
+                    (auction.onchain?.highestBidder && 
+                    auction.onchain.highestBidder !== '0x0000000000000000000000000000000000000000' && 
+                    auction.onchain.highestBidder !== '0x0')
+                    ? `${auction.onchain.highestBidder.slice(0,6)}...${auction.onchain.highestBidder.slice(-4)}`
+                    : ' Chưa có'
+                  }}
+                </span>
+              </p>
               <p>
                 <b>Trạng thái:</b>
                 <span class="px-2 py-1 rounded text-xs" :class="statusClass">
@@ -77,95 +94,152 @@
           </div>
         </div>
 
-        <!-- CỘT PHẢI: Countdown + Đặt giá + Danh sách -->
-        <div class="space-y-6">
-          <!-- Countdown -->
-          <div class="bg-white p-6 rounded-2xl shadow-md border border-gray-200 text-center">
-            <h2 class="text-2xl font-bold text-gray-800 mb-6">Thời gian còn lại</h2>
-            <div class="flex justify-center gap-6 text-center">
-              <div v-for="(val, label) in countdown" :key="label" class="px-4">
-                <p class="text-4xl font-bold text-blue-600">{{ val }}</p>
-                <p class="uppercase text-gray-500 text-sm">{{ label }}</p>
+        <!-- ================= CỘT PHẢI ================= -->
+        <div class="flex flex-col gap-4">
+          <!-- COUNTDOWN -->
+          <div class="bg-white p-6 shadow-lg border border-gray-200 text-center">
+            <div class="flex justify-center items-center gap-0">
+              <!-- DAYS -->
+              <div class="flex flex-col items-center">
+                <div class="text-4xl font-black text-gray-800 leading-none">
+                  {{ countdown.DAYS }}
+                </div>
+                <div class="text-xs uppercase text-gray-500 tracking-widest mt-1">
+                  Days
+                </div>
+              </div>
+
+              <!-- Dấu phân cách dọc -->
+              <div class="w-px h-16 bg-gray-300 mx-4"></div>
+
+              <!-- HOURS -->
+              <div class="flex flex-col items-center">
+                <div class="text-4xl font-black text-gray-800 leading-none">
+                  {{ countdown.HOURS }}
+                </div>
+                <div class="text-xs uppercase text-gray-500 tracking-widest mt-1">
+                  Hours
+                </div>
+              </div>
+
+              <!-- Dấu phân cách dọc -->
+              <div class="w-px h-16 bg-gray-300 mx-4"></div>
+
+              <!-- MINUTES -->
+              <div class="flex flex-col items-center">
+                <div class="text-4xl font-black text-gray-800 leading-none">
+                  {{ countdown.MINUTES }}
+                </div>
+                <div class="text-xs uppercase text-gray-500 tracking-widest mt-1">
+                  Minutes
+                </div>
+              </div>
+
+              <!-- Dấu phân cách dọc -->
+              <div class="w-px h-16 bg-gray-300 mx-4"></div>
+
+              <!-- SECONDS -->
+              <div class="flex flex-col items-center">
+                <div class="text-4xl font-black text-gray-800 leading-none">
+                  {{ countdown.SECONDS }}
+                </div>
+                <div class="text-xs uppercase text-gray-500 tracking-widest mt-1">
+                  Seconds
+                </div>
               </div>
             </div>
-            <p class="mt-4 text-gray-600">
+
+            <!-- Thời gian kết thúc -->
+            <p class="mt-5 text-sm text-gray-600">
               Kết thúc vào: <b>{{ formatDate(auction.onchain?.endTime) }}</b>
             </p>
-            <div class="h-2 bg-blue-100 mt-4 rounded-full overflow-hidden">
+
+            <!-- Thanh tiến độ -->
+            <div class="h-1.5 bg-gray-100 mt-4 rounded-full overflow-hidden">
               <div
-                class="h-full bg-gradient-to-r from-blue-500 to-cyan-500 transition-all duration-1000"
+                class="h-full bg-gradient-to-r from-blue-500 to-cyan-500 transition-all duration-700 rounded-full"
                 :style="{ width: progress + '%' }"
               ></div>
             </div>
           </div>
 
-          <!-- Form đặt giá -->
-          <div class="bg-white p-6 rounded-2xl shadow-md border border-gray-200 text-center">
-            <h2 class="text-xl font-semibold mb-4">Đặt giá bằng MetaMask</h2>
-            <div class="flex flex-col sm:flex-row items-center gap-4 justify-center">
+          <!-- FORM ĐẶT GIÁ -->
+          <div class="bg-white p-8 shadow-lg border border-gray-200 text-center">
+            <h2 class="text-xl font-semibold mb-4">Đấu giá bằng MetaMask</h2>
+
+            <div class="flex flex-col sm:flex-row items-center justify-center gap-4">
               <input
                 v-model.number="bidAmount"
                 type="number"
-                min="0"
                 step="0.001"
                 placeholder="Nhập số ETH"
-                class="border p-3 rounded-lg w-full sm:w-64 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                class="border p-3 w-full sm:w-64 focus:ring-2 focus:ring-blue-500"
               />
+
               <button
                 @click="placeBidAction"
                 :disabled="isPlacing || !canBid"
-                class="bg-gradient-to-r from-blue-600 to-cyan-600 text-white px-6 py-3 rounded-lg hover:from-blue-700 hover:to-cyan-700 transition disabled:opacity-60 font-medium"
+                class="bg-gradient-to-r from-blue-600 to-cyan-600 text-white px-8 py-3
+                       hover:from-blue-700 hover:to-cyan-700 transition disabled:opacity-50 font-semibold"
               >
-                <span v-if="!isPlacing">Đặt giá</span>
-                <span v-else>Đang gửi...</span>
+                <span v-if="!isPlacing">Đấu giá</span>
+                <span v-else>Đang xử lý...</span>
               </button>
             </div>
-            <p v-if="!canBid" class="text-red-500 text-sm mt-2">
-              Bạn không thể đặt giá (đã kết thúc hoặc chưa đủ điều kiện)
+
+            <p v-if="!canBid" class="text-red-500 text-sm mt-3">
+              Phiên đấu giá đã kết thúc — không thể đấu giá.
             </p>
           </div>
 
-          <!-- Danh sách người đấu giá -->
-          <div class="bg-white p-6 rounded-2xl shadow-md border border-gray-200">
+          <!-- DANH SÁCH BIDDERS -->
+          <div class="bg-white p-8 shadow-lg border border-gray-200">
             <div class="flex justify-between items-center mb-4">
               <h2 class="text-xl font-semibold">Danh sách người đấu giá</h2>
+
               <button
                 @click="refreshBids"
-                class="text-sm px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+                class="px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 transition"
               >
                 🔄 Làm mới
               </button>
             </div>
 
             <div v-if="bidders.length" class="overflow-x-auto">
-              <table class="min-w-full border border-gray-200 rounded-xl overflow-hidden">
-                <thead class="bg-blue-100 text-gray-700">
+              <table class="min-w-full text-sm border border-gray-200 overflow-hidden">
+                <thead class="bg-blue-50">
                   <tr>
-                    <th class="py-2 px-4 text-left">#</th>
-                    <th class="py-2 px-4 text-left">Người đấu giá</th>
-                    <th class="py-2 px-4 text-right">Số tiền (ETH)</th>
-                    <th class="py-2 px-4 text-right">Tiền cọc (ETH)</th>
+                    <th class="py-3 px-4 text-left">#</th>
+                    <th class="py-3 px-4 text-left">Địa chỉ</th>
+                    <th class="py-3 px-4 text-right">Giá (ETH)</th>
+                    <th class="py-3 px-4 text-right">Cọc (ETH)</th>
                   </tr>
                 </thead>
+
                 <tbody>
                   <tr
                     v-for="(b, i) in bidders"
-                    :key="b.bidder"
+                    :key="i"
                     class="border-b last:border-0 hover:bg-blue-50 transition"
                   >
-                    <td class="py-2 px-4">{{ i + 1 }}</td>
-                    <td class="py-2 px-4 font-mono truncate max-w-[180px]">{{ b.bidder }}</td>
-                    <td class="py-2 px-4 text-right text-green-700 font-semibold">
+                    <td class="py-3 px-4">{{ i + 1 }}</td>
+                    <td class="py-3 px-4 font-mono truncate max-w-[180px]">
+                      {{ b.bidder }}
+                    </td>
+                    <td class="py-3 px-4 text-right text-green-700 font-semibold">
                       {{ formatEth(b.amount) }}
                     </td>
-                    <td class="py-2 px-4 text-right text-gray-600">
+                    <td class="py-3 px-4 text-right text-gray-600">
                       {{ formatEth(b.deposit) }}
                     </td>
                   </tr>
                 </tbody>
               </table>
             </div>
-            <p v-else class="text-gray-500 text-center py-4">Chưa có ai đấu giá.</p>
+
+            <p v-else class="text-gray-500 text-center py-6">
+              Chưa có ai đấu giá.
+            </p>
           </div>
         </div>
       </div>
