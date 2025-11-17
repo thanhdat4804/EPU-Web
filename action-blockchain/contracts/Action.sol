@@ -1,227 +1,178 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-/**
- * @title Action (Auction Contract with Deposit & Penalty)
- * @notice Mô phỏng một cuộc đấu giá kiểu escrow:
- *  - Khi người dùng đặt giá: chỉ lưu dữ liệu, không trừ tiền
- *  - Nhưng yêu cầu gửi một khoản deposit nhỏ (ví dụ 10%) để tránh spam
- *  - Sau khi hết hạn, người thắng phải thanh toán đủ (trừ phần deposit)
- *  - Nếu không thanh toán, deposit bị phạt & seller có thể thu tiền phạt
- */
-
 contract Action {
-    address public seller;            // Người tạo cuộc đấu giá
-    uint public actionEndTime;        // Thời gian kết thúc đấu giá
-    address public highestBidder;     // Người đang giữ giá cao nhất
-    uint public highestBid;           // Mức giá cao nhất
-    bool public ended;                // Đấu giá đã kết thúc hay chưa
-    bool public isPaidToSeller;       // Đã thanh toán cho người bán chưa
-    bool public isDisputed;           // Có tranh chấp không
-    bool public isPenalized;
-    uint public constant DEPOSIT_RATE = 10; // 10% đặt cọc bắt buộc
+    address public immutable seller;
+    uint public immutable actionEndTime;
+    uint public startingPrice;
+    uint public sellerDeposit;
+
+    address public highestBidder;
+    uint public highestBid;
+
+    bool public ended;
+    bool public buyerPaid;        // Buyer đã thanh toán
+    bool public sellerShipped;    // Seller đã xác nhận giao hàng
+    bool public buyerConfirmed;   // Buyer đã xác nhận nhận hàng OK
+
+    uint public constant BUYER_DEPOSIT_RATE = 10;           // 10% của bid
+    uint public constant SELLER_DEPOSIT_RATE = 20;          // 20% của startingPrice
+    uint public constant CONFIRM_WINDOW = 7 days;           // Buyer có 7 ngày để confirm sau khi seller shipped
+    uint public constant DELIVERY_WINDOW = 14 days;         // Seller có 14 ngày để ship sau khi buyer paid
+
+    uint public buyerPaidAt;      // Timestamp buyer thanh toán
+    uint public sellerShippedAt;  // Timestamp seller xác nhận giao
 
     struct Bid {
-        uint amount;       // Số tiền người mua đặt
-        uint deposit;      // Tiền cọc họ gửi khi đặt giá
-        bool refunded;     // Đã được hoàn tiền chưa
+        uint amount;
+        uint deposit;
+        bool refunded;
     }
-
     mapping(address => Bid) public bids;
     address[] public bidders;
 
-    event BidPlaced(address bidder, uint amount, uint deposit);
-    event ActionEnded(address winner, uint amount);
-    event PaymentMade(address buyer, uint totalPaid);
-    event ItemReceived(address buyer, uint amount);
-    event Refunded(address buyer, uint amount);
-    event Penalized(address bidder, uint deposit);
-    event Disputed(address buyer, uint amount);
+    // ==================== EVENTS ====================
+    event BidPlaced(address indexed bidder, uint amount);
+    event AuctionEnded(address winner, uint finalPrice);
+    event BuyerPaid(address indexed buyer, uint amount);
+    event SellerShipped(address indexed seller);
+    event BuyerConfirmed(address indexed buyer, uint amountReceivedBySeller);
+    event SellerPenalized(address indexed seller, uint penaltyToBuyer, uint burned);
+    event AutoReleasedToSeller(address indexed seller, uint amount);
+    event DepositWithdrawn(address indexed bidder, uint amount);
 
-    /**
-     * @dev Khởi tạo cuộc đấu giá
-     * @param _biddingTime thời gian diễn ra đấu giá (tính bằng giây)
-     * @param _seller địa chỉ người bán
-     */
-    constructor(uint _biddingTime, address _seller) {
-        require(_seller != address(0), "Invalid seller address");
+    constructor(uint _biddingTime, address _seller, uint _startingPrice) payable {
+        require(_seller != address(0), "Invalid seller");
+        require(_startingPrice > 0, "Price > 0");
+        uint required = (_startingPrice * SELLER_DEPOSIT_RATE) / 100;
+        require(msg.value >= required, "Seller deposit insufficient");
+
         seller = _seller;
+        startingPrice = _startingPrice;
+        sellerDeposit = msg.value;
         actionEndTime = block.timestamp + _biddingTime;
     }
 
-    /**
-     * @dev Người dùng đặt giá (chỉ cần đặt cọc 10%)
-     * @param _amount số tiền muốn đấu giá (ETH)
-     */
+    // ==================== ĐẤU GIÁ ====================
     function placeBid(uint _amount) external payable {
-        require(block.timestamp < actionEndTime, "Auction already ended");
-        require(_amount > highestBid, "Bid not high enough");
+        require(block.timestamp < actionEndTime, "Ended");
+        require(_amount > highestBid, "Bid too low");
 
-        uint requiredDeposit = (_amount * DEPOSIT_RATE) / 100;
-        Bid storage userBid = bids[msg.sender];
+        uint requiredDeposit = (_amount * BUYER_DEPOSIT_RATE) / 100;
+        Bid storage b = bids[msg.sender];
 
-        // ✅ KIỂM TRA TRƯỚC KHI GÁN amount
-        bool isFirstBid = (userBid.amount == 0);
+        uint extra = requiredDeposit > b.deposit ? requiredDeposit - b.deposit : 0;
+        require(msg.value >= extra, "Deposit insufficient");
+        if (msg.value > extra) payable(msg.sender).transfer(msg.value - extra);
 
-        // ✅ Tính deposit
-        uint additionalDeposit = 0;
-        if (requiredDeposit > userBid.deposit) {
-            additionalDeposit = requiredDeposit - userBid.deposit;
-            require(msg.value >= additionalDeposit, "Not enough additional deposit");
-            userBid.deposit += additionalDeposit;
-        } else {
-            require(msg.value == 0, "No need to send more deposit");
-        }
+        if (b.amount == 0) bidders.push(msg.sender);
 
-        // ✅ GÁN amount SAU
-        userBid.amount = _amount;
-        userBid.refunded = false;
+        b.amount = _amount;
+        b.deposit = requiredDeposit;
 
-        // ✅ PUSH VỚI ĐIỀU KIỆN ĐÃ LƯU
-        if (isFirstBid) {
-            bidders.push(msg.sender);
-        }
-
-        // ✅ Cập nhật highest
         highestBidder = msg.sender;
         highestBid = _amount;
 
-        emit BidPlaced(msg.sender, _amount, userBid.deposit);
+        emit BidPlaced(msg.sender, _amount);
     }
 
-
-    /**
-     * @dev Kết thúc đấu giá (chỉ seller hoặc admin gọi)
-     */
     function finalize() external {
-        require(block.timestamp >= actionEndTime, "Auction not yet ended");
-        require(!ended, "Already finalized");
+        require(block.timestamp >= actionEndTime, "Not ended");
+        require(!ended, "Already ended");
         ended = true;
-
-        emit ActionEnded(highestBidder, highestBid);
+        emit AuctionEnded(highestBidder, highestBid);
     }
 
-    /**
-     * @dev Người thắng thanh toán phần còn lại (trừ tiền đặt cọc)
-     */
+    // ==================== 1. BUYER THANH TOÁN ====================
     function payWinningBid() external payable {
-        require(ended, "Auction not ended");
-        require(msg.sender == highestBidder, "Only winner can pay");
-        require(!isPaidToSeller, "Already paid");
-        require(!isPenalized, "Winner has been penalized");
+        require(ended, "Not ended");
+        require(msg.sender == highestBidder, "Not winner");
+        require(!buyerPaid, "Already paid");
 
-        uint deposit = bids[msg.sender].deposit;
-        uint remaining = highestBid - deposit;
-        require(msg.value == remaining, "Must pay remaining balance");
+        uint remaining = highestBid - bids[msg.sender].deposit;
+        require(msg.value == remaining, "Wrong amount");
 
-        // CHỈ ĐÁNH DẤU ĐÃ THANH TOÁN, KHÔNG CHUYỂN TIỀN
-        isPaidToSeller = true;
+        buyerPaid = true;
+        buyerPaidAt = block.timestamp;
 
-        emit PaymentMade(msg.sender, highestBid);
+        emit BuyerPaid(msg.sender, highestBid);
     }
 
+    // ==================== 2. SELLER XÁC NHẬN ĐÃ GIAO HÀNG ====================
+    function confirmShipped() external {
+        require(msg.sender == seller, "Not seller");
+        require(buyerPaid, "Buyer not paid");
+        require(!sellerShipped, "Already shipped");
+        require(block.timestamp <= buyerPaidAt + DELIVERY_WINDOW, "Too late to ship");
 
+        sellerShipped = true;
+        sellerShippedAt = block.timestamp;
+
+        emit SellerShipped(seller);
+    }
+
+    // ==================== 3. BUYER XÁC NHẬN ĐÃ NHẬN HÀNG OK → TIỀN CHUYỂN CHO SELLER ====================
     function confirmReceived() external {
-        require(msg.sender == highestBidder, "Only buyer can confirm");
-        require(isPaidToSeller, "Payment not completed"); // BẮT BUỘC ĐÃ PAY
-        require(!isDisputed, "Disputed transaction");
+        require(msg.sender == highestBidder, "Not buyer");
+        require(sellerShipped, "Seller not shipped");
+        require(!buyerConfirmed, "Already confirmed");
 
-        // CHUYỂN TOÀN BỘ TIỀN (deposit + remaining) CHO SELLER
-        payable(seller).transfer(highestBid);
+        buyerConfirmed = true;
 
-        emit ItemReceived(highestBidder, highestBid);
+        uint totalToSeller = highestBid + sellerDeposit;
+        payable(seller).transfer(totalToSeller);
+
+        emit BuyerConfirmed(msg.sender, totalToSeller);
     }
 
-    /**
-     * @dev Seller hoặc hệ thống có thể mở tranh chấp nếu hàng không đúng
-     */
-    function openDispute() external {
-        require(ended, "Auction not ended");
-        require(msg.sender == highestBidder || msg.sender == seller, "Not allowed");
-        require(!isDisputed, "Already disputed");
+    // ==================== 4. TỰ ĐỘNG CHUYỂN TIỀN CHO SELLER NẾU BUYER QUÊN CONFIRM ====================
+    function releaseToSeller() external {
+        require(sellerShipped, "Not shipped");
+        require(!buyerConfirmed, "Already confirmed");
+        require(block.timestamp > sellerShippedAt + CONFIRM_WINDOW, "Still in confirm window");
 
-        isDisputed = true;
-        emit Disputed(highestBidder, highestBid);
+        buyerConfirmed = true; // đánh dấu để không gọi lại
+        uint totalToSeller = highestBid + sellerDeposit;
+        payable(seller).transfer(totalToSeller);
+
+        emit AutoReleasedToSeller(seller, totalToSeller);
     }
 
-    /**
-     * @dev Seller hoàn tiền nếu tranh chấp thành công
-     */
-    function refundBuyer() external {
-        require(isDisputed, "No dispute");
-        require(msg.sender == seller, "Only seller can refund buyer");
+    // ==================== 5. PHẠT SELLER NẾU KHÔNG GIAO HÀNG ====================
+    function penalizeSeller() external {
+        require(buyerPaid, "Buyer not paid");
+        require(!sellerShipped, "Already shipped");
+        require(block.timestamp > buyerPaidAt + DELIVERY_WINDOW, "Still in delivery window");
 
-        payable(highestBidder).transfer(highestBid);
-        emit Refunded(highestBidder, highestBid);
+        uint half = sellerDeposit / 2;
+        payable(highestBidder).transfer(highestBid + half);      // trả tiền bid + 50% cọc seller
+        payable(address(0xdead)).transfer(half);                 // đốt 50%
+
+        emit SellerPenalized(seller, half + highestBid, half);
     }
 
-    /**
-     * @dev Nếu người thắng không thanh toán sau 24h -> mất cọc
-     */
-    function penalizeWinner() external {
-        require(ended, "Auction not ended");
-        require(!isPaidToSeller, "Already paid");
-        require(!isPenalized, "Already penalized");
-        require(block.timestamp > actionEndTime + 1 minutes, "Too early to penalize");
-
-        Bid storage bidInfo = bids[highestBidder];
-        uint penalty = bidInfo.deposit;
-        require(penalty > 0, "No deposit to penalize");
-
-        bidInfo.deposit = 0;
-        payable(seller).transfer(penalty);
-
-        isPenalized = true; // ✅ đánh dấu phạt xong rồi
-
-        emit Penalized(highestBidder, penalty);
-    }
-
-
-    /**
-     * @dev Người thua có thể rút lại tiền cọc sau khi đấu giá kết thúc
-     */
+    // ==================== RÚT CỌC NGƯỜI THUA ====================
     function withdrawDeposit() external {
-        require(ended, "Auction not ended");
-        require(msg.sender != highestBidder, "Winner cannot withdraw");
-        Bid storage bidInfo = bids[msg.sender];
-        require(!bidInfo.refunded, "Already refunded");
-        require(bidInfo.deposit > 0, "No deposit found");
+        require(ended, "Not ended");
+        Bid storage b = bids[msg.sender];
+        require(b.deposit > 0, "No deposit");
+        require(b.refunded == false, "Already withdrawn");
 
-        uint amount = bidInfo.deposit;
-        bidInfo.deposit = 0;
-        bidInfo.refunded = true;
+        if (msg.sender == highestBidder) {
+            require(buyerConfirmed || sellerShipped == false, "Winner can't withdraw now");
+        }
 
-        payable(msg.sender).transfer(amount);
-        emit Refunded(msg.sender, amount);
+        b.refunded = true;
+        payable(msg.sender).transfer(b.deposit);
+        emit DepositWithdrawn(msg.sender, b.deposit);
     }
 
-    /**
-     * @dev Lấy toàn bộ danh sách người đặt giá & số tiền họ đặt
-     */
-    function getAllBids() public view returns (address[] memory, uint[] memory, uint[] memory) {
-        uint validCount = 0;
-        for (uint i = 0; i < bidders.length; i++) {
-            if (bidders[i] != address(0) && bids[bidders[i]].amount > 0) {
-                validCount++;
-            }
-        }
-
-        address[] memory validBidders = new address[](validCount);
-        uint[] memory amounts = new uint[](validCount);
-        uint[] memory deposits = new uint[](validCount);
-
-        uint index = 0;
-        for (uint i = 0; i < bidders.length; i++) {
-            address bidder = bidders[i];
-            if (bidder == address(0)) continue;
-            if (bids[bidder].amount > 0) {
-                validBidders[index] = bidder;
-                amounts[index] = bids[bidder].amount;
-                deposits[index] = bids[bidder].deposit;
-                index++;
-            }
-        }
-
-        return (validBidders, amounts, deposits);
+    // ==================== VIEW ====================
+    function getStatus() external view returns (string memory) {
+        if (!ended) return "Active";
+        if (!buyerPaid) return "Ended - Awaiting Payment";
+        if (!sellerShipped) return "Paid - Awaiting Shipment";
+        if (!buyerConfirmed) return "Shipped - Awaiting Confirmation";
+        return "Completed";
     }
 }
