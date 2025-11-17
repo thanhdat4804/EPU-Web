@@ -48,15 +48,12 @@ async function bootstrap() {
       path: '/',
     },
   })
-
-  // Bỏ qua CSRF cho route upload file
+  
+  // // Bỏ qua CSRF cho route upload file
   app.use((req: Request, res: Response, next: NextFunction) => {
-    if (req.path.startsWith('/auction/create') && req.method === 'POST') {
-      return next() // Bỏ qua CSRF cho upload
-    }
     return csrfProtection(req, res, next)
   })
-
+  //Đây là lúc không có CSRF 
   // ========================================
   // 4. Xử lý lỗi CSRF – Trả JSON rõ ràng
   // ========================================
