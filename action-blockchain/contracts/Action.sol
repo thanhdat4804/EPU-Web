@@ -17,8 +17,8 @@ contract Action {
 
     uint public constant BUYER_DEPOSIT_RATE = 10;           // 10% của bid
     uint public constant SELLER_DEPOSIT_RATE = 20;          // 20% của startingPrice
-    uint public constant CONFIRM_WINDOW = 7 days;           // Buyer có 7 ngày để confirm sau khi seller shipped
-    uint public constant DELIVERY_WINDOW = 14 days;         // Seller có 14 ngày để ship sau khi buyer paid
+    uint public constant CONFIRM_WINDOW = 60;           // Buyer có 7 ngày để confirm sau khi seller shipped
+    uint public constant DELIVERY_WINDOW = 60;         // Seller có 14 ngày để ship sau khi buyer paid
 
     uint public buyerPaidAt;      // Timestamp buyer thanh toán
     uint public sellerShippedAt;  // Timestamp seller xác nhận giao
@@ -134,7 +134,6 @@ contract Action {
         buyerConfirmed = true; // đánh dấu để không gọi lại
         uint totalToSeller = highestBid + sellerDeposit;
         payable(seller).transfer(totalToSeller);
-
         emit AutoReleasedToSeller(seller, totalToSeller);
     }
 

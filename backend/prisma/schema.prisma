@@ -94,6 +94,7 @@ model Auction {
   transactions    Transaction[]
   winner          AuctionWinner? @relation("AuctionHasWinner") // ✅ đặt tên rõ ràng
   createdAt       DateTime  @default(now())
+  buyerPaidAt     DateTime?
 }
 
 model AuctionWinner {

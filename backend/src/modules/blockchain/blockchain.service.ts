@@ -258,59 +258,76 @@ export class BlockchainService {
       }
     }
   }
-  @Cron(CronExpression.EVERY_MINUTE)
+  @Cron(CronExpression.EVERY_30_SECONDS) // test nhanh
   async autoPenalizeSeller() {
     if (!this.adminWallet) {
-      this.logger.warn('ADMIN_PRIVATE_KEY not set → skip auto penalize seller');
+      this.logger.warn('ADMIN_PRIVATE_KEY not set');
       return;
     }
 
-    this.logger.log('Bắt đầu kiểm tra phạt seller...');
+    this.logger.log('Bắt đầu kiểm tra phạt seller (đọc 100% từ contract)');
 
-    const now = Math.floor(Date.now() / 1000);
     const auctions = await this.prisma.auction.findMany({
-      where: { status: 'Paid' }, // Chỉ lấy những cái đã thanh toán
+      where: { status: 'Paid' },
+      select: { id: true, contractAddress: true },
     });
 
-    for (const auction of auctions) {
-      try {
-        const contract = new ethers.Contract(auction.contractAddress, this.auctionABI, this.adminWallet);
+    let count = 0;
 
-        // DÙNG CHÍNH XÁC CÁC HÀM TRONG CONTRACT MỚI
+    for (const a of auctions) {
+      try {
+        const contract = new ethers.Contract(a.contractAddress, this.auctionABI, this.adminWallet);
+
         const [buyerPaidAt, sellerShipped] = await Promise.all([
-          contract.buyerPaidAt().catch(() => 0),
-          contract.sellerShipped().catch(() => false),
+          contract.buyerPaidAt(),
+          contract.sellerShipped(),
         ]);
 
-        // Nếu chưa thanh toán → bỏ qua
-        if (!buyerPaidAt || buyerPaidAt === 0) continue;
+        const paidAt = Number(buyerPaidAt);
+        const now = Math.floor(Date.now() / 1000);
 
-        // Nếu seller đã giao hàng → bỏ qua
-        if (sellerShipped) continue;
+        // LOG ĐỂ BẠN THẤY RÕ MỌI THỨ
+        this.logger.log(`Contract ${a.contractAddress} | paidAt=${paidAt} | shipped=${sellerShipped} | now=${now}`);
 
-        // Nếu quá 14 ngày kể từ khi buyer thanh toán → PHẠT SELLER
-        if (now > Number(buyerPaidAt) + 14 * 24 * 60 * 60) {
-          const tx = await contract.penalizeSeller({ gasLimit: 300000 });
-          await tx.wait();
-
-          await this.prisma.auction.update({
-            where: { id: auction.id },
-            data: { status: 'PenalizedSeller' },
-          });
-
-          this.logger.warn(`PHẠT SELLER THÀNH CÔNG: ${auction.contractAddress} | Tx: ${tx.hash}`);
-        }
-      } catch (err: any) {
-        // BỎ QUA LỖI CONTRACT CŨ HOẶC ĐÃ ĐƯỢC XỬ LÝ
-        if (err.code === 'CALL_EXCEPTION' || err.message.includes('reverted')) {
+        if (paidAt === 0) {
+          this.logger.log(`→ Chưa thanh toán hoặc contract cũ → bỏ qua`);
           continue;
         }
-        this.logger.error(`Lỗi kiểm tra phạt seller ${auction.contractAddress}: ${err.message}`);
+        if (sellerShipped) {
+          this.logger.log(`→ Seller đã shipped → bỏ qua`);
+          continue;
+        }
+        if (now <= paidAt + 60) {
+          this.logger.log(`→ Chưa đủ 60 giây → còn ${(paidAt + 60 - now)} giây nữa`);
+          continue;
+        }
+        
+        // ĐẾN ĐÂY LÀ PHẢI PHẠT
+        this.logger.warn(`ĐỦ 60 GIÂY → ĐANG PHẠT SELLER: ${a.contractAddress}`);
+
+        const tx = await contract.penalizeSeller({ gasLimit: 500000 });
+        await tx.wait();
+        
+        await this.prisma.auction.update({
+          where: { id: a.id },
+          data: { status: 'PenalizedSeller' },
+        });
+        
+        count++;
+        this.logger.warn(`PHẠT SELLER THÀNH CÔNG! Tx: ${tx.hash}`);
+
+      } catch (err: any) {
+        if (err.reason?.includes('Still in delivery window')) {
+          this.logger.log(`→ Chưa đủ thời gian (contract mới nhưng chưa tới hạn)`);
+          continue;
+        }
+        this.logger.error(`Lỗi contract ${a.contractAddress}: ${err.reason || err.message}`);
       }
     }
 
-    this.logger.log('Kiểm tra phạt seller hoàn tất.');
+    this.logger.log(`Hoàn tất – Đã phạt: ${count} seller`);
   }
+
   async penalizeWinner(address: string) {
     if (!this.adminWallet) throw new BadRequestException('No admin wallet');
     const contract = new ethers.Contract(address, this.auctionABI, this.adminWallet);
@@ -483,7 +500,9 @@ export class BlockchainService {
     // Cập nhật DB
     await this.prisma.auction.update({
       where: { id: auction.id },
-      data: { status: 'Paid' },
+      data: { status: 'Paid',
+        buyerPaidAt: new Date()
+       },
     });
 
     // Ghi transaction
