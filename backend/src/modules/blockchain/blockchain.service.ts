@@ -41,6 +41,7 @@ export class BlockchainService {
     'function ended() view returns (bool)',
     'function seller() view returns (address)',
     'function getAllBids() view returns (address[], uint256[], uint256[])',
+    'function autoRefundLosers() external',
   ];
 
   constructor(private prisma: PrismaService) {
@@ -194,8 +195,13 @@ export class BlockchainService {
           continue;
         }
 
-        const tx = await contract.finalize();
-        await tx.wait();
+        const tx1 = await contract.finalize();
+        await tx1.wait();
+
+        const tx2 = await contract.autoRefundLosers({ gasLimit: 3_000_000 });
+        await tx2.wait();
+
+        this.logger.warn(`HOÀN CỌC TỰ ĐỘNG CHO TẤT CẢ NGƯỜI THUA THÀNH CÔNG! Contract: ${a.contractAddress} | Tx: ${tx2.hash}`);
 
         // LẤY USER ID TỪ ĐỊA CHỈ VÍ
         const bidderUser = await this.prisma.user.findUnique({
@@ -258,7 +264,7 @@ export class BlockchainService {
       }
     }
   }
-  @Cron(CronExpression.EVERY_30_SECONDS) // test nhanh
+  @Cron(CronExpression.EVERY_MINUTE) // test nhanh
   async autoPenalizeSeller() {
     if (!this.adminWallet) {
       this.logger.warn('ADMIN_PRIVATE_KEY not set');
