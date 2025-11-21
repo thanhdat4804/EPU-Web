@@ -124,7 +124,7 @@
               <p class="text-sm text-gray-600 uppercase tracking-wider font-medium mb-2">
                 BID HIỆN TẠI
               </p>
-              <p class="text-5xl font-bold text-gray-900 leading-tight">
+              <p class="text-5xl font-medium tracking-tight text-gray-900">
                 {{ formatEth(currentPrice) }}
               </p>
             </div>
