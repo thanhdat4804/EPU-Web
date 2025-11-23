@@ -26,20 +26,16 @@
             <option value="">Tất cả</option>
             <option value="pending">Chờ duyệt</option>
             <option value="approved">Đã duyệt</option>
-            <option value="active">Đang đấu giá</option>
-            <option value="sold">Đã bán</option>
-            <option value="unsold">Chưa bán</option>
+            <option value="Active">Đang đấu giá</option>
+            <option value="Ended">Đã kết thúc</option>
+            <option value="Cancelled">Đã hủy</option>
           </select>
         </div>
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-2">Danh mục</label>
           <select v-model="filters.category" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
             <option value="">Tất cả</option>
-            <option value="art">Nghệ thuật</option>
-            <option value="jewelry">Trang sức</option>
-            <option value="watches">Đồng hồ</option>
-            <option value="antiques">Đồ cổ</option>
-            <option value="cars">Xe cổ</option>
+            <option v-for="cat in categories" :key="cat.id" :value="cat.name">{{ cat.name }}</option>
           </select>
         </div>
         <div>
@@ -67,164 +63,110 @@
       <table class="min-w-full divide-y divide-gray-200">
         <thead class="bg-gray-50">
           <tr>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Lot
-            </th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Danh mục
-            </th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Giá khởi điểm
-            </th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Giá hiện tại
-            </th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Trạng thái
-            </th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Thao tác
-            </th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Lot</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Danh mục</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Giá khởi điểm</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Trạng thái</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Thao tác</th>
           </tr>
         </thead>
+
         <tbody class="bg-white divide-y divide-gray-200">
-          <tr v-for="lot in lots" :key="lot.id" class="hover:bg-gray-50">
+          <tr v-for="lot in filteredLots" :key="lot.id" class="hover:bg-gray-50">
             <td class="px-6 py-4 whitespace-nowrap">
               <div class="flex items-center">
-                <img :src="lot.image" :alt="lot.title" class="w-12 h-12 rounded object-cover" />
+                <img :src="lot.item?.imageUrl || '/no-image.jpg'" alt="image" class="w-12 h-12 rounded object-cover" />
                 <div class="ml-4">
-                  <div class="text-sm font-medium text-gray-900">{{ lot.title }}</div>
-                  <div class="text-sm text-gray-500">{{ lot.code }}</div>
+                  <div class="text-sm font-medium text-gray-900">{{ lot.item?.name }}</div>
+                  <div class="text-sm text-gray-500">{{ lot.contractAddress.slice(0, 10) }}...</div>
                 </div>
               </div>
             </td>
             <td class="px-6 py-4 whitespace-nowrap">
-              <span class="text-sm text-gray-900">{{ lot.category }}</span>
+              <span class="text-sm text-gray-900">{{ lot.item?.category?.name || '—' }}</span>
             </td>
-            <td class="px-6 py-4 whitespace-nowrap">
-              <span class="text-sm text-gray-900">${{ lot.startPrice.toLocaleString() }}</span>
-            </td>
-            <td class="px-6 py-4 whitespace-nowrap">
-              <span class="text-sm font-medium text-gray-900">${{ lot.currentPrice.toLocaleString() }}</span>
+            <td class="px-6 py-4 font-bold whitespace-nowrap">
+              <span class="text-sm text-gray-900">{{lot.item?.startingPrice}} ETH</span>
             </td>
             <td class="px-6 py-4 whitespace-nowrap">
               <span :class="getStatusClass(lot.status)" class="px-2 py-1 text-xs font-semibold rounded-full">
-                {{ getStatusText(lot.status) }}
+                {{ lot.status }}
               </span>
             </td>
             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
               <div class="flex items-center gap-2">
-                <button @click="viewLot(lot.id)" class="text-blue-600 hover:text-blue-900">Xem</button>
-                <button @click="editLot(lot.id)" class="text-green-600 hover:text-green-900">Sửa</button>
-                <button @click="deleteLot(lot.id)" class="text-red-600 hover:text-red-900">Xóa</button>
+                <button @click="viewLot(lot.contractAddress)" class="text-blue-600 hover:text-blue-900">Xem</button>
               </div>
             </td>
           </tr>
         </tbody>
       </table>
     </div>
-
-    <!-- Pagination -->
-    <div class="flex items-center justify-between bg-white rounded-lg shadow px-6 py-4">
-      <div class="text-sm text-gray-700">
-        Hiển thị <span class="font-medium">1</span> đến <span class="font-medium">10</span> trong <span class="font-medium">{{ totalLots }}</span> kết quả
-      </div>
-      <div class="flex gap-2">
-        <button class="px-3 py-1 border border-gray-300 rounded hover:bg-gray-50">Trước</button>
-        <button class="px-3 py-1 bg-blue-600 text-white rounded">1</button>
-        <button class="px-3 py-1 border border-gray-300 rounded hover:bg-gray-50">2</button>
-        <button class="px-3 py-1 border border-gray-300 rounded hover:bg-gray-50">3</button>
-        <button class="px-3 py-1 border border-gray-300 rounded hover:bg-gray-50">Sau</button>
-      </div>
-    </div>
   </div>
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 
-definePageMeta({
-  layout: 'admin'
-})
+definePageMeta({ layout: 'admin' })
 
-const filters = ref({
-  status: '',
-  category: '',
-  search: ''
-})
+const API_BASE = 'http://localhost:3001'
+const lots = ref([])
+const categories = ref([])
+const filters = ref({ status: '', category: '', search: '' })
 
-const totalLots = ref(156)
-
-const lots = ref([
-  {
-    id: 1,
-    code: 'LOT-2024-001',
-    title: 'Đồng hồ Rolex Submariner',
-    category: 'Đồng hồ',
-    image: 'https://via.placeholder.com/150',
-    startPrice: 15000,
-    currentPrice: 23000,
-    status: 'active'
-  },
-  {
-    id: 2,
-    code: 'LOT-2024-002',
-    title: 'Tranh sơn dầu Picasso',
-    category: 'Nghệ thuật',
-    image: 'https://via.placeholder.com/150',
-    startPrice: 50000,
-    currentPrice: 50000,
-    status: 'pending'
-  },
-  {
-    id: 3,
-    code: 'LOT-2024-003',
-    title: 'Nhẫn kim cương 5 carat',
-    category: 'Trang sức',
-    image: 'https://via.placeholder.com/150',
-    startPrice: 30000,
-    currentPrice: 45000,
-    status: 'active'
+// 🟢 Lấy danh sách đấu giá
+const fetchLots = async () => {
+  try {
+    const res = await fetch(`${API_BASE}/auction/list`)
+    lots.value = await res.json()
+  } catch (err) {
+    console.error('❌ Lỗi khi tải lots:', err)
   }
-])
+}
+
+// 🟢 Lấy danh mục
+const fetchCategories = async () => {
+  try {
+    const res = await fetch(`${API_BASE}/categories`)
+    categories.value = await res.json()
+  } catch (err) {
+    console.error('❌ Lỗi khi tải categories:', err)
+  }
+}
+
+//🟢 Chuyển trang detail
+const viewLot = (address) => {
+  navigateTo(`/admin/lots/${address}`)
+}
+
+onMounted(async () => {
+  await Promise.all([fetchLots(), fetchCategories()])
+})
+
+// 🎯 Lọc dữ liệu
+const filteredLots = computed(() => {
+  return lots.value.filter(lot => {
+    const matchStatus = !filters.value.status || lot.status === filters.value.status
+    const matchCategory = !filters.value.category || lot.item?.category?.name === filters.value.category
+    const matchSearch = !filters.value.search || lot.item?.name.toLowerCase().includes(filters.value.search.toLowerCase())
+    return matchStatus && matchCategory && matchSearch
+  })
+})
+
+const formatPrice = (p) => {
+  return p ? p.toLocaleString('vi-VN', { style: 'currency', currency: 'VND' }) : '—'
+}
 
 const getStatusClass = (status) => {
-  const classes = {
+  const map = {
     pending: 'bg-yellow-100 text-yellow-800',
-    approved: 'bg-blue-100 text-blue-800',
-    active: 'bg-green-100 text-green-800',
-    sold: 'bg-purple-100 text-purple-800',
-    unsold: 'bg-gray-100 text-gray-800'
+    Active: 'bg-green-100 text-green-800',
+    Ended: 'bg-gray-100 text-gray-800',
+    Cancelled: 'bg-red-100 text-red-800'
   }
-  return classes[status] || classes.pending
+  return map[status] || 'bg-gray-100 text-gray-800'
 }
 
-const getStatusText = (status) => {
-  const texts = {
-    pending: 'Chờ duyệt',
-    approved: 'Đã duyệt',
-    active: 'Đang đấu giá',
-    sold: 'Đã bán',
-    unsold: 'Chưa bán'
-  }
-  return texts[status] || status
-}
-
-const resetFilters = () => {
-  filters.value = { status: '', category: '', search: '' }
-}
-
-const viewLot = (id) => {
-  console.log('View lot:', id)
-}
-
-const editLot = (id) => {
-  console.log('Edit lot:', id)
-}
-
-const deleteLot = (id) => {
-  if (confirm('Bạn có chắc muốn xóa lot này?')) {
-    console.log('Delete lot:', id)
-  }
-}
+const resetFilters = () => (filters.value = { status: '', category: '', search: '' })
 </script>

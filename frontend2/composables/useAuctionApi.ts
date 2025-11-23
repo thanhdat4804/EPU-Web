@@ -1,125 +1,213 @@
+// composables/useAuctionApi.ts
 import { $fetch } from 'ofetch'
 
 const API_BASE = 'http://localhost:3001/auction'
 
 export function useAuctionApi() {
-  // 🟢 Lấy tất cả đấu giá
-  const getAuctions = async (): Promise<any[]> => {
+  const { $csrfToken } = useNuxtApp()
+
+  // 🧩 Lấy JWT token từ localStorage
+  const getJwt = () => localStorage.getItem('jwt') || ''
+
+  // 🧩 Sinh headers động (JWT + CSRF)
+  const getHeaders = (isFormData = false) => {
+    const headers: Record<string, string> = {}
+    const jwt = getJwt()
+    if (jwt) headers['Authorization'] = `Bearer ${jwt}`
+
+    const csrf = $csrfToken()
+    if (csrf) headers['X-CSRF-Token'] = csrf
+
+    if (!isFormData) headers['Content-Type'] = 'application/json'
+    return headers
+  }
+
+  // ============================================================
+  // 🟢 GET: Danh sách tất cả đấu giá
+  // ============================================================
+  const getAuctions = async () => {
     return await $fetch(`${API_BASE}/list`)
   }
 
-  // 🟢 Lấy chi tiết 1 đấu giá
-  const getAuctionDetail = async (address: string): Promise<any> => {
+  // ============================================================
+  // 🟢 GET: Chi tiết 1 đấu giá (DB + Onchain)
+  // ============================================================
+  const getAuctionDetail = async (address: string) => {
     return await $fetch(`${API_BASE}/${address}/detail`)
   }
 
-  // 🟢 Lấy danh sách bid của 1 đấu giá
+  // ============================================================
+  // 🟢 GET: Danh sách người đặt giá (on-chain)
+  // ============================================================
   const getAllBids = async (address: string): Promise<any[]> => {
-    return await $fetch(`${API_BASE}/${address}/bids`)
+  try {
+    const res = await $fetch(`${API_BASE}/${address}/bids`, {
+      headers: getHeaders(),
+    })
+    return Array.isArray(res) ? res : []
+  } catch (error) {
+    console.warn('getAllBids failed:', error)
+    return [] // TRẢ MẢNG RỖNG → FRONTEND HIỆN "Chưa có ai đấu giá"
+  }
+}
+
+  // ============================================================
+  // 🟢 GET: Danh sách đấu giá mà user đã thắng
+  // ============================================================
+  const getMyWinningAuctions = async () => {
+    const jwt = getJwt()
+    if (!jwt) throw new Error('Bạn chưa đăng nhập')
+    return await $fetch(`${API_BASE}/my-wins`, {
+      method: 'GET',
+      headers: getHeaders(),
+      credentials: 'include',
+    })
+  }
+  // ============================================================
+  // 🟡 GET: Danh sách đấu giá của tôi
+  // ============================================================
+  const getMyAuctions = async () => {
+    const token = localStorage.getItem('jwt')
+    const res = await fetch(`${API_BASE}/my`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    if (!res.ok) throw new Error('Lỗi tải')
+    return res.json()
   }
 
-  // 🟢 Tạo đấu giá mới
-  const createAuction = async (auctionData: any): Promise<any> => {
-    const token = localStorage.getItem('jwt')
-    if (!token) throw new Error('User not logged in')
+  // ============================================================
+  // 🟡 POST: Tạo đấu giá mới (kèm ảnh chính + ảnh phụ)
+  // ============================================================
+  const createAuction = async (formData: FormData) => {
+    const jwt = getJwt()
+    if (!jwt) throw new Error('User not logged in')
 
     return await $fetch(`${API_BASE}/create`, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${token}` },
-      body: auctionData,
+      headers: getHeaders(true),
+      credentials: 'include',
+      body: formData,
     })
   }
 
-  // 🟢 Đặt giá (gửi deposit)
-  const placeBid = async (address: string, amount: number, deposit: number): Promise<any> => {
-    const token = localStorage.getItem('jwt')
-    if (!token) throw new Error('User not logged in')
-
-    return await $fetch(`${API_BASE}/${address}/bid`, {
+  // ============================================================
+  // 🟡 POST: Ghi nhận giao dịch đặt giá
+  // ============================================================
+  const recordBid = async (address: string, amount: number, txHash: string) => {
+    const jwt = getJwt()
+    if (!jwt) throw new Error('User not logged in')
+    return await $fetch(`${API_BASE}/${address}/record-bid`, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${token}` },
-      body: { amount, deposit },
+      credentials: 'include',
+      headers: getHeaders(),
+      body: { amount, txHash },
     })
   }
 
-  // 🟢 Thanh toán phần còn lại (winner)
-  const payWinningBid = async (address: string, amount: number): Promise<any> => {
-    const token = localStorage.getItem('jwt')
-    if (!token) throw new Error('User not logged in')
-
-    return await $fetch(`${API_BASE}/${address}/pay`, {
+  // ============================================================
+  // 🟡 POST: Ghi nhận thanh toán
+  // ============================================================
+  const recordPayment = async (address: string, txHash: string) => {
+    const jwt = getJwt()
+    if (!jwt) throw new Error('User not logged in')
+    return await $fetch(`${API_BASE}/${address}/record-payment`, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${token}` },
-      body: { amount },
+      credentials: 'include',
+      headers: getHeaders(),
+      body: { txHash },
     })
   }
 
-  // 🟢 Xác nhận đã nhận hàng
-  const confirmReceived = async (address: string): Promise<any> => {
-    const token = localStorage.getItem('jwt')
-    if (!token) throw new Error('User not logged in')
-
+  // ============================================================
+  // 🟡 POST: Xác nhận người thắng đã nhận hàng
+  // ============================================================
+  const confirmReceived = async (address: string, txHash: string) => {
+    const jwt = getJwt()
+    if (!jwt) throw new Error('Bạn chưa đăng nhập')
     return await $fetch(`${API_BASE}/${address}/confirm`, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${token}` },
+      credentials: 'include',
+      headers: getHeaders(),
+      body: { txHash },
     })
   }
 
-  // 🟢 Mở tranh chấp
-  const openDispute = async (address: string): Promise<any> => {
-    const token = localStorage.getItem('jwt')
-    if (!token) throw new Error('User not logged in')
-
+  // ============================================================
+  // 🟡 POST: Mở tranh chấp
+  // ============================================================
+  const openDispute = async (address: string) => {
+    const jwt = getJwt()
+    if (!jwt) throw new Error('User not logged in')
     return await $fetch(`${API_BASE}/${address}/dispute`, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${token}` },
+      headers: getHeaders(),
     })
   }
 
-  // 🟢 Seller hoàn tiền cho buyer khi tranh chấp thắng
-  const refundBuyer = async (address: string): Promise<any> => {
-    const token = localStorage.getItem('jwt')
-    if (!token) throw new Error('User not logged in')
-
+  // ============================================================
+  // 🟡 POST: Hoàn tiền cho người mua
+  // ============================================================
+  const refundBuyer = async (address: string) => {
+    const jwt = getJwt()
+    if (!jwt) throw new Error('User not logged in')
     return await $fetch(`${API_BASE}/${address}/refund`, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${token}` },
+      headers: getHeaders(),
     })
   }
 
-  // 🟢 Người thua rút tiền cọc
-  const withdrawDeposit = async (address: string): Promise<any> => {
-    const token = localStorage.getItem('jwt')
-    if (!token) throw new Error('User not logged in')
-
+  // ============================================================
+  // 🟡 POST: Rút cọc cho người thua
+  // ============================================================
+  const withdrawDeposit = async (address: string) => {
+    const jwt = getJwt()
+    if (!jwt) throw new Error('User not logged in')
     return await $fetch(`${API_BASE}/${address}/withdraw`, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${token}` },
+      headers: getHeaders(),
     })
   }
 
-  // 🟢 Phạt người thắng nếu không thanh toán sau 24h
-  const penalizeWinner = async (address: string): Promise<any> => {
-    const token = localStorage.getItem('jwt')
-    if (!token) throw new Error('User not logged in')
-
+  // ============================================================
+  // 🟡 POST: Phạt người thắng không thanh toán
+  // ============================================================
+  const penalizeWinner = async (address: string) => {
+    const jwt = getJwt()
+    if (!jwt) throw new Error('User not logged in')
     return await $fetch(`${API_BASE}/${address}/penalize`, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${token}` },
+      headers: getHeaders(),
     })
   }
 
+  // ============================================================
+  // XÁC NHẬN GIAO HÀNG (SELLER BẤM)
+  // ============================================================
+  const confirmShipped = async (address: string, txHash: string) => {
+    const jwt = getJwt()
+    if (!jwt) throw new Error('Bạn chưa đăng nhập')
+
+    return await $fetch(`${API_BASE}/${address}/confirm-shipped`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: getHeaders(),
+      body: { txHash },
+    })
+  }
   return {
     getAuctions,
     getAuctionDetail,
     getAllBids,
+    getMyWinningAuctions,
     createAuction,
-    placeBid,
-    payWinningBid,
+    recordBid,
+    recordPayment,
     confirmReceived,
     openDispute,
     refundBuyer,
     withdrawDeposit,
     penalizeWinner,
+    getMyAuctions,
+    confirmShipped,
   }
 }

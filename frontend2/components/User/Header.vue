@@ -2,8 +2,19 @@
   <header class="bg-white shadow-sm sticky top-0 z-50">
     <div class="flex items-center justify-between px-8 py-4 relative">
       <!-- Logo -->
-      <NuxtLink to="/User" class="text-2xl font-bold text-blue-600 select-none">
+      <NuxtLink
+        to="/auction"
+        class="text-2xl font-bold text-blue-600 select-none"
+      >
         BidDora
+      </NuxtLink>
+
+      <!-- 🧿 Nút "Đấu giá nào" luôn hiển thị -->
+      <NuxtLink
+        to="/auction/create"
+        class="ml-6 flex items-center gap-2 bg-gradient-to-r from-blue-500 to-indigo-600 text-white px-5 py-2 rounded-full font-semibold text-sm shadow-md hover:shadow-lg hover:scale-[1.03] transition-all duration-300"
+      >
+        <span>Đấu giá nào</span>
       </NuxtLink>
 
       <!-- Thanh tìm kiếm -->
@@ -16,20 +27,6 @@
             class="w-full border border-gray-300 rounded-full py-2 px-4 pl-10 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent"
             @input="handleSearch"
           />
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            class="h-5 w-5 text-gray-400 absolute left-3 top-2.5"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M21 21l-4.35-4.35m0 0A7.5 7.5 0 1016.65 16.65z"
-            />
-          </svg>
 
           <!-- Dropdown kết quả tìm kiếm -->
           <div
@@ -78,9 +75,32 @@
 
         <!-- Nếu đã đăng nhập -->
         <template v-else>
-          <div class="flex items-center space-x-2 bg-gray-100 px-3 py-1 rounded-full">
+          <!-- 🦊 Nếu chưa có ví -->
+          <button
+            v-if="!walletAddress"
+            @click="connectWallet"
+            :disabled="isConnecting"
+            class="bg-yellow-500 text-white px-4 py-2 rounded-full text-sm hover:bg-yellow-600 transition disabled:opacity-60"
+          >
+            <span v-if="!isConnecting">🔗 Kết nối ví MetaMask</span>
+            <span v-else>⏳ Đang kết nối...</span>
+          </button>
+
+          <!-- 🟢 Nếu đã có ví -->
+          <div
+            v-else
+            class="text-sm font-mono text-gray-600 bg-gray-100 px-3 py-1 rounded-full"
+          >
+            🦊 {{ shortWallet(walletAddress) }}
+          </div>
+
+          <!-- 👤 Hồ sơ & đăng xuất -->
+          <div
+            @click="goToProfile"
+            class="flex items-center space-x-2 bg-gray-100 px-3 py-1 rounded-full cursor-pointer hover:bg-gray-200 transition"
+          >
             <i class="fas fa-user text-gray-600"></i>
-            <span class="font-medium text-gray-800 text-sm">{{ user.username }}</span>
+            <span class="font-medium text-gray-800 text-sm">{{ user.name }}</span>
           </div>
           <button
             @click="logout"
@@ -95,59 +115,103 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, onMounted, computed } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
+import { useWallet } from '~/composables/useWallet'
 
 const router = useRouter()
+const route = useRoute()
 const search = ref('')
 const searchResults = ref([])
 const user = ref(null)
 let timeout = null
 
-onMounted(() => {
-  const storedUser = localStorage.getItem('user')
-  if (storedUser) {
-    user.value = JSON.parse(storedUser)
+// 🦊 Wallet
+const { walletAddress, connectMetamask, fetchWallet, isConnecting } = useWallet()
+
+// ✅ Kiểm tra xem có đang ở trang tạo đấu giá không
+const isCreatePage = computed(() => route.path === '/auction/create')
+
+// 🔹 Điều hướng về danh sách đấu giá
+const goToAuctionList = () => {
+  router.push('/auction')
+}
+
+onMounted(async () => {
+  const token = localStorage.getItem('jwt')
+  if (!token) return
+
+  try {
+    const userData = await $fetch('http://localhost:3001/users/me', {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    user.value = userData
+    localStorage.setItem('user', JSON.stringify(userData))
+    await fetchWallet(userData.id)
+  } catch (err) {
+    console.error('Không thể tải thông tin user:', err)
+    localStorage.removeItem('jwt')
+    localStorage.removeItem('user')
   }
 })
 
-const handleSearch = async () => {
+// ✅ Tìm kiếm
+const handleSearch = () => {
   clearTimeout(timeout)
   if (!search.value.trim()) {
     searchResults.value = []
     return
   }
 
-  // debounce 300ms tránh spam API
   timeout = setTimeout(async () => {
     try {
-      const res = await $fetch(`http://localhost:3001/items?search=${encodeURIComponent(search.value)}`)
-      searchResults.value = res
+      const res = await $fetch(
+        `http://localhost:3001/items/search/by-name?name=${encodeURIComponent(
+          search.value
+        )}`
+      )
+      searchResults.value = Array.isArray(res) ? res : []
     } catch (err) {
-      console.error('Lỗi khi tìm kiếm:', err)
+      console.error('❌ Lỗi khi tìm kiếm item:', err)
       searchResults.value = []
     }
   }, 300)
 }
 
+const connectWallet = async () => {
+  if (!user.value) {
+    alert('Vui lòng đăng nhập trước khi liên kết ví!')
+    return
+  }
+  await connectMetamask(user.value.id)
+}
+
+const shortWallet = (addr) =>
+  addr ? `${addr.slice(0, 6)}...${addr.slice(-4)}` : ''
+
 const goToItem = (id) => {
   search.value = ''
   searchResults.value = []
-  router.push(`/User/item/${id}`)
+  router.push(`/auction/${id}`)
+}
+
+const goToProfile = () => {
+  router.push('/User/profile')
 }
 
 const logout = () => {
   localStorage.removeItem('jwt')
   localStorage.removeItem('user')
   user.value = null
+  walletAddress.value = null
   window.location.reload()
 }
 
 const formatPrice = (price) => {
   if (!price) return '—'
-  return new Intl.NumberFormat('vi-VN', {
-    style: 'currency',
-    currency: 'VND'
-  }).format(price)
+  return `${Number(price).toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })} ETH`
 }
 </script>
