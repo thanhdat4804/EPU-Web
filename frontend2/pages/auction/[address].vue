@@ -1,384 +1,321 @@
 <template>
-  <div class="bg-gray-50 min-h-screen">
-    <!-- Header -->
+  <div class="min-h-screen bg-white font-sans text-gray-900 antialiased">
     <Header />
 
-    <!-- Nội dung chính -->
-    <div class="p-8">
-      <div v-if="auction" class="max-w-7xl mx-auto grid md:grid-cols-2 gap-8 items-start">
-        <!-- CỘT TRÁI: Thông tin vật phẩm + Ảnh -->
-        <div class="space-y-6">
-          <div class="bg-white p-6 rounded-none shadow-md border border-gray-200">
-            <!-- ẢNH CHÍNH -->
-            <div class="relative mb-4">
-              <img
-                :src="getImageUrl(auction.item?.mainImage)"
-                class="w-full h-96 object-cover rounded-xl border shadow-sm transition-transform hover:scale-[1.02]"
-                alt="Ảnh chính"
-                @click="showFullImage(getImageUrl(auction.item?.mainImage))"
-              />
-              <!-- Placeholder -->
-              <div
-                v-if="!auction.item?.mainImage"
-                class="absolute inset-0 flex items-center justify-center bg-gray-100 rounded-xl border"
-              >
-                <span class="text-gray-400 text-lg">Không có ảnh chính</span>
+    <div class="max-w-7xl mx-auto px-6 py-10">
+      <div v-if="auction" class="grid lg:grid-cols-3 gap-12">
+        <!-- LEFT COLUMN (2/3) -->
+        <div class="lg:col-span-2 space-y-10">
+
+          <!-- Ảnh chính + badge -->
+          <div class="relative cursor-zoom-in group">
+            <img
+              :src="getImageUrl(auction.item?.mainImage)"
+              class="w-full object-cover border border-gray-300 transition-transform group-hover:scale-[1.01]"
+              alt="Ảnh chính"
+              @click="openLightbox(0)"
+            />
+            <div class="absolute top-4 left-4 bg-white border border-gray-300 px-4 py-2 flex items-center gap-2 text-sm font-medium shadow-sm">
+              <svg class="w-4 h-4 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+              </svg>
+              Đã được chuyên gia kiểm định
+            </div>
+          </div>
+
+          <!-- Ảnh phụ (6 ô + overlay +X) -->
+          <div v-if="auction.item?.subImages?.length" class="grid grid-cols-6 gap-3">
+            <!-- Ảnh chính luôn hiện đầu -->
+            <div @click="openLightbox(0)" class="border border-gray-300 cursor-pointer hover:border-gray-500 overflow-hidden transition">
+              <img :src="getImageUrl(auction.item.mainImage)" class="w-full aspect-square object-cover" />
+            </div>
+
+            <!-- 5 ảnh phụ tiếp theo -->
+            <template v-for="(img, i) in auction.item.subImages.slice(0, 5)" :key="i">
+              <div @click="openLightbox(i + 1)" class="border border-gray-300 cursor-pointer hover:border-gray-500 overflow-hidden transition">
+                <img :src="getImageUrl(img)" class="w-full aspect-square object-cover" />
+              </div>
+            </template>
+
+            <!-- Ô cuối cùng: hiện +X nếu còn ảnh -->
+            <div v-if="auction.item.subImages.length > 5" @click="openLightbox(0)" class="relative border border-gray-300 cursor-pointer group overflow-hidden">
+              <img :src="getImageUrl(auction.item.subImages[5])" class="w-full aspect-square object-cover brightness-75 group-hover:brightness-50 transition" />
+              <div class="absolute inset-0 flex items-center justify-center">
+                <span class="text-white text-2xl font-bold">
+                  +{{ auction.item.subImages.length - 5 }}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tiêu đề + chuyên gia + mô tả -->
+          <div class="space-y-8">
+            <div>
+              <p class="text-sm text-gray-600 uppercase tracking-wider">
+                {{ auction.item?.category?.name }}
+              </p>
+              <h1 class="mt-2 text-4xl font-bold leading-tight">
+                {{ auction.item?.name }}
+              </h1>
+            </div>
+
+            <div class="flex items-start gap-4 py-6 border-t border-b">
+              <div class="w-16 h-16 bg-blue-600 rounded-full flex-shrink-0 flex items-center justify-center text-white text-xl font-bold">
+                E
+              </div>
+              <div>
+                <p class="font-semibold">Được chọn bởi chuyên gia</p>
+                <p class="text-gray-600 mt-1">Chuyên gia kiểm định đồ cổ với hơn 10 năm kinh nghiệm trong lĩnh vực.</p>
               </div>
             </div>
 
-            <!-- ẢNH PHỤ -->
-            <div v-if="auction.item?.subImages?.length" class="mt-4">
-              <p class="text-sm font-semibold text-gray-700 mb-2">Ảnh phụ:</p>
-              <div class="flex gap-3 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-gray-300">
-                <div v-for="(img, i) in auction.item.subImages" :key="i" class="flex-shrink-0">
-                  <img
-                    :src="getImageUrl(img)"
-                    class="w-24 h-24 object-cover rounded-lg border shadow-sm hover:scale-105 transition-transform cursor-pointer"
-                    @click="showFullImage(getImageUrl(img))"
-                  />
-                </div>
-              </div>
+            <div class="prose prose-lg text-gray-700 leading-relaxed">
+              <p>{{ auction.item?.description || 'Không có mô tả chi tiết.' }}</p>
             </div>
 
-            <!-- Tên + Mô tả -->
-            <h1 class="text-3xl font-bold text-gray-800 mb-3">
-              {{ auction.item?.name || 'Chi tiết đấu giá' }}
-            </h1>
-            <div v-if="auction.item?.category?.name" class="mb-4">
-              <p class="font-semibold text-gray-800 mb-1">Thể loại:</p>
-              <p class="text-blue-600 font-medium text-lg">
-                {{ auction.item.category.name }}
-              </p>
-            </div>
-            <div class="mb-4">
-              <p class="font-semibold text-gray-800 mb-1">Mô tả:</p>
-              <p class="text-gray-600 leading-relaxed">
-                {{ auction.item?.description || 'Không có mô tả.' }}
-              </p>
-            </div>
-
-            <!-- Thông tin cơ bản -->
-            <div class="space-y-2 text-gray-700 text-sm">
-              <p><b>Người bán:</b> {{ auction.seller?.email || 'Ẩn danh' }}</p>
-              <p>
-                <b>Giá khởi điểm:</b>
-                <span class="text-gray-900 font-medium">
-                  {{ formatEth(auction.item?.startingPrice) }}
-                </span>
-              </p>
-              <p>
-                <b>Giá hiện tại:</b>
-                <span class="font-semibold text-green-600">
-                  {{ formatEth(auction.onchain?.highestBid || auction.item?.startingPrice) }}
-                </span>
-              </p>
-              <p>
-                <b>Người giữ giá cao nhất:</b>
-                <span class="font-mono text-blue-600">
-                  {{ 
-                    (auction.onchain?.highestBidder && 
-                    auction.onchain.highestBidder !== '0x0000000000000000000000000000000000000000' && 
-                    auction.onchain.highestBidder !== '0x0')
-                    ? `${auction.onchain.highestBidder.slice(0,6)}...${auction.onchain.highestBidder.slice(-4)}`
-                    : ' Chưa có'
-                  }}
-                </span>
-              </p>
-              <p>
-                <b>Trạng thái:</b>
-                <span class="px-2 py-1 rounded text-xs" :class="statusClass">
-                  {{ auction.status }}
-                </span>
-              </p>
+            <div class="grid grid-cols-2 gap-8 py-6 border-t text-sm">
+              <div><span class="text-gray-600">Người bán:</span> <strong>{{ auction.seller?.email }}</strong></div>
+              <div><span class="text-gray-600">Tình trạng:</span> <strong>{{ auction.item?.condition || 'Tốt' }}</strong></div>
             </div>
           </div>
         </div>
 
-        <!-- ================= CỘT PHẢI ================= -->
-        <div class="flex flex-col gap-4">
-          <!-- COUNTDOWN -->
-          <div class="bg-white p-6 shadow-lg border border-gray-200 text-center">
-            <div class="flex justify-center items-center gap-0">
-              <!-- DAYS -->
-              <div class="flex flex-col items-center">
-                <div class="text-4xl font-black text-gray-800 leading-none">
-                  {{ countdown.DAYS }}
-                </div>
-                <div class="text-xs uppercase text-gray-500 tracking-widest mt-1">
-                  Days
-                </div>
-              </div>
+        <!-- RIGHT COLUMN (1/3) -->
+        <div class="lg:sticky lg:top-6 h-fit">
+          <div class="border border-gray-300 overflow-hidden shadow-sm">
 
-              <!-- Dấu phân cách dọc -->
-              <div class="w-px h-16 bg-gray-300 mx-4"></div>
+            <!-- CHỈ CÒN "Friday 02:53 PM" Ở TRÊN CÙNG (góc phải) -->
+            <div class="bg-gray-50 px-6 py-3 border-b text-right text-xs text-gray-600 font-medium">
+              {{ formatDateToday() }}
+            </div>
 
-              <!-- HOURS -->
-              <div class="flex flex-col items-center">
-                <div class="text-4xl font-black text-gray-800 leading-none">
-                  {{ countdown.HOURS }}
+            <!-- COUNTDOWN – ĐẸP NHƯ ẢNH, KHÔNG BỊ TO -->
+            <div class="bg-white px-6 py-8">
+              <div class="flex justify-center items-center gap-4 text-3xl font-mono font-bold text-gray-900">
+                <div class="text-center">
+                  <div>{{ countdown.DAYS }}</div>
+                  <div class="text-xs text-gray-500 uppercase tracking-wider mt-1">Days</div>
                 </div>
-                <div class="text-xs uppercase text-gray-500 tracking-widest mt-1">
-                  Hours
+                <span class="text-gray-300">|</span>
+                <div class="text-center">
+                  <div>{{ countdown.HOURS }}</div>
+                  <div class="text-xs text-gray-500 uppercase tracking-wider mt-1">Hours</div>
                 </div>
-              </div>
-
-              <!-- Dấu phân cách dọc -->
-              <div class="w-px h-16 bg-gray-300 mx-4"></div>
-
-              <!-- MINUTES -->
-              <div class="flex flex-col items-center">
-                <div class="text-4xl font-black text-gray-800 leading-none">
-                  {{ countdown.MINUTES }}
+                <span class="text-gray-300">|</span>
+                <div class="text-center">
+                  <div>{{ countdown.MINUTES }}</div>
+                  <div class="text-xs text-gray-500 uppercase tracking-wider mt-1">Minutes</div>
                 </div>
-                <div class="text-xs uppercase text-gray-500 tracking-widest mt-1">
-                  Minutes
-                </div>
-              </div>
-
-              <!-- Dấu phân cách dọc -->
-              <div class="w-px h-16 bg-gray-300 mx-4"></div>
-
-              <!-- SECONDS -->
-              <div class="flex flex-col items-center">
-                <div class="text-4xl font-black text-gray-800 leading-none">
-                  {{ countdown.SECONDS }}
-                </div>
-                <div class="text-xs uppercase text-gray-500 tracking-widest mt-1">
-                  Seconds
+                <span class="text-gray-300">|</span>
+                <div class="text-center">
+                  <div class="text-red-600">{{ countdown.SECONDS }}</div>
+                  <div class="text-xs text-gray-500 uppercase tracking-wider mt-1">Seconds</div>
                 </div>
               </div>
             </div>
 
-            <!-- Thời gian kết thúc -->
-            <p class="mt-5 text-sm text-gray-600">
-              Kết thúc vào: <b>{{ formatDate(auction.onchain?.endTime) }}</b>
-            </p>
-
-            <!-- Thanh tiến độ -->
-            <div class="h-1.5 bg-gray-100 mt-4 rounded-full overflow-hidden">
-              <div
-                class="h-full bg-gradient-to-r from-blue-500 to-cyan-500 transition-all duration-700 rounded-full"
-                :style="{ width: progress + '%' }"
-              ></div>
+            <!-- END TIME – DƯỚI COUNTDOWN -->
+            <div class="bg-gray-50 px-6 py-3 border-t text-center text-xs text-gray-700 font-medium">
+              End Time: <strong>{{ formatTime(auction.value?.onchain?.endTime) }}</strong>
             </div>
-          </div>
 
-          <!-- FORM ĐẶT GIÁ -->
-          <div class="bg-white p-8 shadow-lg border border-gray-200 text-center">
-            <h2 class="text-xl font-semibold mb-4">Đấu giá bằng MetaMask</h2>
+            <!-- BID HIỆN TẠI -->
+            <div class="bg-gray-50 px-8 py-7 text-center border-t border-b">
+              <p class="text-sm text-gray-600 uppercase tracking-wider font-medium mb-2">
+                BID HIỆN TẠI
+              </p>
+              <p class="text-5xl font-medium tracking-tight text-gray-900">
+                {{ formatEth(currentPrice) }}
+              </p>
+            </div>
 
-            <div class="flex flex-col sm:flex-row items-center justify-center gap-4">
-              <input
-                v-model.number="bidAmount"
-                type="number"
-                step="0.001"
-                placeholder="Nhập số ETH"
-                class="border p-3 w-full sm:w-64 focus:ring-2 focus:ring-blue-500"
-              />
+            <!-- FORM ĐẶT GIÁ -->
+            <div class="p-8 space-y-5 bg-white">
+              <div class="relative">
+                <input
+                  v-model.number="bidAmount"
+                  type="number"
+                  step="0.001"
+                  placeholder=" "
+                  class="w-full px-5 py-4 text-xl font-mono text-center border border-gray-300 focus:border-gray-900 outline-none transition peer placeholder:text-gray-400"
+                  @focus="clearZero"
+                />
+                <span class="absolute inset-0 flex items-center justify-center pointer-events-none text-sm text-gray-400 font-medium select-none
+                            peer-focus:hidden peer-not-empty:hidden">
+                  Từ {{ formatEth(minNextBid) }} trở lên
+                </span>
+              </div>
 
               <button
                 @click="placeBidAction"
-                :disabled="isPlacing || !canBid"
-                class="bg-gradient-to-r from-blue-600 to-cyan-600 text-white px-8 py-3
-                       hover:from-blue-700 hover:to-cyan-700 transition disabled:opacity-50 font-semibold"
+                :disabled="isPlacing || !canBid || !bidAmount || bidAmount < minNextBid"
+                class="w-full py-4 bg-catawiki-blue hover:bg-blue-700 disabled:bg-gray-300 text-white font-bold text-lg transition"
               >
-                <span v-if="!isPlacing">Đấu giá</span>
-                <span v-else>Đang xử lý...</span>
+                {{ isPlacing ? 'Đang gửi...' : 'Đặt giá' }}
               </button>
+
+              <p v-if="!canBid" class="text-center text-red-600 font-medium text-sm -mt-3">
+                Phiên đấu giá đã kết thúc
+              </p>
             </div>
 
-            <p v-if="!canBid" class="text-red-500 text-sm mt-3">
-              Phiên đấu giá đã kết thúc — không thể đấu giá.
-            </p>
-          </div>
-
-          <!-- DANH SÁCH BIDDERS -->
-          <div class="bg-white p-8 shadow-lg border border-gray-200">
-            <div class="flex justify-between items-center mb-4">
-              <h2 class="text-xl font-semibold">Danh sách người đấu giá</h2>
-
-              <button
-                @click="refreshBids"
-                class="px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 transition"
-              >
-                🔄 Làm mới
-              </button>
+            <!-- LỊCH SỬ NGẮN -->
+            <div class="border-t bg-gray-50 px-8 py-6 text-sm">
+              <div class="flex justify-between items-center mb-3">
+                <span class="font-medium">Lượt đấu giá</span>
+                <strong class="text-lg">{{ bidders.length }}</strong>
+              </div>
+              <div v-if="bidders.length" class="space-y-3">
+                <div v-for="(b, i) in bidders.slice(0, 3)" :key="i" class="flex justify-between">
+                  <span class="font-mono text-gray-600">{{ b.bidder.slice(0,8) }}...{{ b.bidder.slice(-6) }}</span>
+                  <span class="font-semibold">{{ formatEth(b.amount) }}</span>
+                </div>
+              </div>
             </div>
 
-            <div v-if="bidders.length" class="overflow-x-auto">
-              <table class="min-w-full text-sm border border-gray-200 overflow-hidden">
-                <thead class="bg-blue-50">
-                  <tr>
-                    <th class="py-3 px-4 text-left">#</th>
-                    <th class="py-3 px-4 text-left">Địa chỉ</th>
-                    <th class="py-3 px-4 text-right">Giá (ETH)</th>
-                    <th class="py-3 px-4 text-right">Cọc (ETH)</th>
-                  </tr>
-                </thead>
-
-                <tbody>
-                  <tr
-                    v-for="(b, i) in bidders"
-                    :key="i"
-                    class="border-b last:border-0 hover:bg-blue-50 transition"
-                  >
-                    <td class="py-3 px-4">{{ i + 1 }}</td>
-                    <td class="py-3 px-4 font-mono truncate max-w-[180px]">
-                      {{ b.bidder }}
-                    </td>
-                    <td class="py-3 px-4 text-right text-green-700 font-semibold">
-                      {{ formatEth(b.amount) }}
-                    </td>
-                    <td class="py-3 px-4 text-right text-gray-600">
-                      {{ formatEth(b.deposit) }}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-
-            <p v-else class="text-gray-500 text-center py-6">
-              Chưa có ai đấu giá.
-            </p>
           </div>
         </div>
       </div>
 
       <!-- Loading -->
-      <div v-else class="text-center text-gray-600 mt-20 text-lg">
-        <div class="inline-block animate-spin rounded-full h-12 w-12 border-4 border-blue-100 border-t-blue-600"></div>
-        <p class="mt-4">Đang tải thông tin đấu giá...</p>
+      <div v-else class="text-center py-32">
+        <div class="inline-block animate-spin rounded-full h-16 w-16 border-4 border-gray-200 border-t-gray-900"></div>
       </div>
     </div>
+
+    <!-- LIGHTBOX FULLSCREEN -->
+    <teleport to="body">
+      <div v-if="lightboxOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black" @click.self="closeLightbox">
+        <img :src="allImages[lightboxIndex]" class="max-w-full max-h-full object-contain select-none" />
+
+        <button @click="closeLightbox" class="absolute top-6 right-6 text-white hover:text-gray-300">
+          <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+
+        <button @click.stop="prevImage" class="absolute left-6 top-1/2 -translate-y-1/2 text-white hover:text-gray-300">
+          <svg class="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+          </svg>
+        </button>
+
+        <button @click.stop="nextImage" class="absolute right-6 top-1/2 -translate-y-1/2 text-white hover:text-gray-300">
+          <svg class="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+          </svg>
+        </button>
+
+        <div class="absolute bottom-6 left-1/2 -translate-x-1/2 bg-black/60 text-white px-4 py-2 rounded text-sm font-medium">
+          {{ lightboxIndex + 1 }} / {{ allImages.length }}
+        </div>
+      </div>
+    </teleport>
   </div>
 </template>
 
 <script setup lang="ts">
 import Header from '~/components/User/Header.vue'
-import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { ethers } from 'ethers'
 import { useAuctionApi } from '~/composables/useAuctionApi'
-
+const bidAmount = ref<number | null>(null)
 const route = useRoute()
 const auction = ref<any>(null)
 const bidders = ref<any[]>([])
-const bidAmount = ref(0)
 const isPlacing = ref(false)
 const { getAuctionDetail, getAllBids, recordBid } = useAuctionApi()
 
-// Countdown
 const countdown = ref({ DAYS: '00', HOURS: '00', MINUTES: '00', SECONDS: '00' })
-const progress = ref(0)
-let timer: ReturnType<typeof setInterval> | null = null
-let bidRefreshTimer: ReturnType<typeof setInterval> | null = null
+let timer: any = null
+let bidRefreshTimer: any = null
 
-// === HÀM ===
+// ================= THÊM 2 DÒNG NÀY ĐỂ FIX LỖI =================
+const currentPrice = computed(() => 
+  auction.value?.onchain?.highestBid || auction.value?.item?.startingPrice || 0
+)
+
+const minNextBid = computed(() => currentPrice.value * 1)
+// ==============================================================
+
+// Lightbox
+const lightboxOpen = ref(false)
+const lightboxIndex = ref(0)
+const allImages = computed(() => {
+  if (!auction.value?.item) return []
+  return [auction.value.item.mainImage, ...(auction.value.item.subImages || [])]
+    .filter(Boolean)
+    .map(img => getImageUrl(img))
+})
+
+const openLightbox = (index: number) => {
+  lightboxIndex.value = index
+  lightboxOpen.value = true
+  document.body.style.overflow = 'hidden'
+}
+const closeLightbox = () => {
+  lightboxOpen.value = false
+  document.body.style.overflow = ''
+}
+const prevImage = () => lightboxIndex.value = (lightboxIndex.value - 1 + allImages.value.length) % allImages.value.length
+const nextImage = () => lightboxIndex.value = (lightboxIndex.value + 1) % allImages.value.length
+
+// ESC key
+const handleEscKey = (e: KeyboardEvent) => {
+  if (e.key === 'Escape' && lightboxOpen.value) closeLightbox()
+}
+onMounted(() => window.addEventListener('keydown', handleEscKey))
+onUnmounted(() => window.removeEventListener('keydown', handleEscKey))
+
+// Utils
 const getImageUrl = (filename: string | null | undefined): string =>
   filename ? `http://localhost:3001/uploads/${filename}` : '/no-image.jpg'
 
-const showFullImage = (src: string) => {
-  const img = new Image()
-  img.src = src
-  Object.assign(img.style, {
-    maxWidth: '90%',
-    maxHeight: '90%',
-    margin: 'auto',
-    display: 'block',
-    borderRadius: '12px',
-    boxShadow: '0 20px 40px rgba(0,0,0,0.4)',
-  })
-  const overlay = document.createElement('div')
-  Object.assign(overlay.style, {
-    position: 'fixed',
-    top: '0', left: '0',
-    width: '100%', height: '100%',
-    backgroundColor: 'rgba(0,0,0,0.85)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: '9999',
-    cursor: 'zoom-out'
-  })
-  overlay.onclick = () => document.body.removeChild(overlay)
-  overlay.appendChild(img)
-  document.body.appendChild(overlay)
-}
-
-const formatDate = (input: string | number) => {
-  let date: Date
-  if (typeof input === 'string') date = new Date(input)
-  else if (typeof input === 'number') date = new Date(input * 1000)
-  else return '—'
-  return date.toLocaleString('vi-VN', {
-    timeZone: 'Asia/Ho_Chi_Minh',
-    day: '2-digit', month: '2-digit', year: 'numeric',
-    hour: '2-digit', minute: '2-digit'
-  })
-}
-
 const formatEth = (val: number | string | undefined | null) => {
-  if (!val) return '—'
+  if (!val) return '0.0000 ETH'
   const num = typeof val === 'string' ? parseFloat(val) : val
   return `${num.toFixed(4)} ETH`
 }
 
-// === COUNTDOWN ===
 const updateCountdown = () => {
   if (!auction.value?.onchain?.endTime) return
   const endMs = new Date(auction.value.onchain.endTime).getTime()
   const now = Date.now()
-  const remaining = Math.max(0, endMs - now)
-  const days = Math.floor(remaining / (1000 * 60 * 60 * 24))
-  const hours = Math.floor((remaining / (1000 * 60 * 60)) % 24)
-  const minutes = Math.floor((remaining / (1000 * 60)) % 60)
-  const seconds = Math.floor((remaining / 1000) % 60)
+  const diff = Math.max(0, endMs - now)
+  const days = Math.floor(diff / 86400000)
+  const hours = Math.floor((diff / 3600000) % 24)
+  const minutes = Math.floor((diff / 60000) % 60)
+  const seconds = Math.floor((diff / 1000) % 60)
   countdown.value = {
     DAYS: String(days).padStart(2, '0'),
     HOURS: String(hours).padStart(2, '0'),
     MINUTES: String(minutes).padStart(2, '0'),
     SECONDS: String(seconds).padStart(2, '0')
   }
-  const start = new Date(auction.value.createdAt).getTime()
-  progress.value = ((now - start) / (endMs - start)) * 100
 }
 
 const canBid = computed(() => {
   if (!auction.value?.onchain?.endTime) return false
-  const endTime = new Date(auction.value.onchain.endTime).getTime()
-  return Date.now() < endTime && auction.value.status === 'Active'
+  return Date.now() < new Date(auction.value.onchain.endTime).getTime() && auction.value.status === 'Active'
 })
 
-// === LOAD DATA ===
 const loadBids = async (address: string) => {
-  try {
-    bidders.value = await getAllBids(address)
-    console.log('Bidders:', bidders.value)
-  } catch (err) {
-    console.error('Lỗi load danh sách đấu giá:', err)
-  }
-}
-const refreshBids = async () => {
-  const address = route.params.address as string
-  await loadBids(address)
-  alert('Danh sách người đấu giá đã được cập nhật!')
+  try { bidders.value = await getAllBids(address) } catch (err) { console.error(err) }
 }
 
 onMounted(async () => {
-  try {
-    const address = route.params.address as string
-    auction.value = await getAuctionDetail(address)
-    await loadBids(address)
-    updateCountdown()
-    timer = setInterval(updateCountdown, 1000)
-    bidRefreshTimer = setInterval(() => loadBids(address), 15000)
-  } catch (err) {
-    console.error('Lỗi tải chi tiết:', err)
-  }
+  const address = route.params.address as string
+  auction.value = await getAuctionDetail(address)
+  await loadBids(address)
+  updateCountdown()
+  timer = setInterval(updateCountdown, 1000)
+  bidRefreshTimer = setInterval(() => loadBids(address), 15000)
 })
+
 onUnmounted(() => {
-  if (timer) clearInterval(timer)
-  if (bidRefreshTimer) clearInterval(bidRefreshTimer)
+  clearInterval(timer)
+  clearInterval(bidRefreshTimer)
 })
 
 // === ĐẶT GIÁ ===
@@ -388,8 +325,9 @@ const placeBidAction = async () => {
   if (!window.ethereum) return alert('Vui lòng cài MetaMask.')
   if (!bidAmount.value || bidAmount.value <= 0) return alert('Số tiền không hợp lệ.')
 
-  const minBid = (auction.value.onchain?.highestBid || auction.value.item?.startingPrice) * 1.05
-  if (bidAmount.value < minBid) return alert(`Phải đặt ít nhất ${minBid.toFixed(4)} ETH`)
+  if (bidAmount.value < minNextBid.value) {
+    return alert(`Phải đặt ít nhất ${minNextBid.value.toFixed(4)} ETH`)
+  }
 
   try {
     isPlacing.value = true
@@ -400,10 +338,12 @@ const placeBidAction = async () => {
     const abi = ['function placeBid(uint _amount) payable']
     const contract = new ethers.Contract(contractAddress, abi, signer)
     const deposit = bidAmount.value * 0.1
+
     const tx = await contract.placeBid(
       ethers.utils.parseEther(bidAmount.value.toString()),
       { value: ethers.utils.parseEther(deposit.toString()) }
     )
+
     alert('Giao dịch đang xử lý...')
     await tx.wait()
     await recordBid(contractAddress, bidAmount.value, tx.hash)
@@ -418,20 +358,38 @@ const placeBidAction = async () => {
   }
 }
 
-const statusClass = computed(() => {
-  const s = auction.value?.status
-  if (s === 'Active') return 'bg-green-100 text-green-800'
-  if (s === 'Ended') return 'bg-red-100 text-red-800'
-  return 'bg-gray-100 text-gray-800'
-})
+// Hàm xóa số 0 khi focus
+const clearZero = () => {
+  if (bidAmount.value === 0 || bidAmount.value === null) {
+    bidAmount.value = null
+  }
+}
+const formatDateToday = () => {
+  return new Date().toLocaleDateString('en-US', {
+    weekday: 'long',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true
+  })
+}
+
+// 2. Hiển thị End Time kiểu: 18:00
+const formatTime = (isoString: string | undefined) => {
+  if (!isoString) return '—'
+  return new Date(isoString).toLocaleTimeString('en-US', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  })
+}
 </script>
 
 <style scoped>
-.scrollbar-thin::-webkit-scrollbar {
-  height: 6px;
+@import url('https://rsms.me/inter/inter.css');
+html { font-family: 'Inter', system-ui, sans-serif; }
+@supports (font-variation-settings: normal) {
+  html { font-family: 'Inter var', system-ui, sans-serif; }
 }
-.scrollbar-thin::-webkit-scrollbar-thumb {
-  background-color: #cbd5e0;
-  border-radius: 3px;
-}
+.bg-catawiki-blue { background-color: #0066FF; }
+.text-catawiki-blue { color: #0066FF; }
 </style>

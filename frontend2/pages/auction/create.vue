@@ -158,7 +158,19 @@
                 placeholder="0.05"
               />
               <p v-if="errors.startingPrice" class="mt-1 text-xs text-red-600">{{ errors.startingPrice }}</p>
+
+              <!-- HIỂN THỊ CỌC 20% -->
+              <div class="mt-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                <p class="text-sm font-medium text-amber-800">
+                  Cọc bắt buộc (20%): 
+                  <span class="font-bold">{{ sellerDeposit }} ETH</span>
+                </p>
+                <p class="text-xs text-amber-600 mt-1">
+                  Sẽ bị mất nếu không giao hàng đúng hạn
+                </p>
+              </div>
             </div>
+
             <div class="group">
               <label class="block text-sm font-semibold text-gray-700 mb-2">
                 <span class="text-blue-600">Giá sàn (ETH)</span>
@@ -219,13 +231,12 @@
             </div>
           </div>
 
-          <!-- Thời gian đấu giá (Ngày / Giờ / Phút) -->
+          <!-- Thời gian đấu giá -->
           <div class="group">
             <label class="block text-sm font-semibold text-gray-700 mb-2">
               <span class="text-cyan-600">Thời gian đấu giá</span>
             </label>
             <div class="grid grid-cols-3 gap-3">
-              <!-- Ngày -->
               <div>
                 <input
                   v-model.number="duration.days"
@@ -239,7 +250,6 @@
                 />
                 <p class="text-xs text-gray-600 mt-1 text-center">Ngày</p>
               </div>
-              <!-- Giờ -->
               <div>
                 <input
                   v-model.number="duration.hours"
@@ -253,7 +263,6 @@
                 />
                 <p class="text-xs text-gray-600 mt-1 text-center">Giờ</p>
               </div>
-              <!-- Phút -->
               <div>
                 <input
                   v-model.number="duration.minutes"
@@ -268,19 +277,11 @@
                 <p class="text-xs text-gray-600 mt-1 text-center">Phút</p>
               </div>
             </div>
-
-            <!-- Hiển thị tổng -->
             <p class="mt-2 text-sm font-medium text-cyan-700">
               Tổng: <span class="font-bold">{{ formatDuration }}</span>
             </p>
-
-            <!-- Lỗi -->
             <p v-if="errors.biddingTime" class="mt-1 text-xs text-red-600">{{ errors.biddingTime }}</p>
-
-            <!-- Gợi ý -->
-            <p class="mt-1 text-xs text-blue-600">
-              Tối thiểu 1 phút
-            </p>
+            <p class="mt-1 text-xs text-blue-600">Tối thiểu 1 phút</p>
           </div>
 
           <!-- Nút tạo -->
@@ -301,7 +302,7 @@
             <div class="animate-spin rounded-full h-20 w-20 border-t-4 border-blue-600 absolute top-0 left-0"></div>
           </div>
           <p class="mt-6 text-xl font-semibold text-blue-700">Đang triển khai hợp đồng...</p>
-          <p class="mt-2 text-sm text-blue-600">Vui lòng chờ, giao dịch đang được xác nhận trên blockchain</p>
+          <p class="mt-2 text-sm text-blue-600">Cọc: {{ sellerDeposit }} ETH đang được gửi</p>
         </div>
       </div>
     </div>
@@ -337,30 +338,22 @@ const subImagesInput = ref<HTMLInputElement | null>(null)
 
 // THỜI GIAN
 const duration = ref({ days: 1, hours: 0, minutes: 0 })
-const biddingTime = ref(86400) // giây
+const biddingTime = ref(86400)
 
-// TOUCHED
-const touched = ref({
-  name: false,
-  mainImage: false,
-  startingPrice: false,
-  reservePrice: false,
-  estimateMin: false,
-  estimateMax: false,
-  biddingTime: false,
-  categoryId: false
+// CỌC 20%
+const sellerDeposit = computed(() => {
+  if (!startingPrice.value) return 0
+  return startingPrice.value * 0.2
 })
 
-// ERRORS
+// TOUCHED & ERRORS
+const touched = ref({
+  name: false, mainImage: false, startingPrice: false, reservePrice: false,
+  estimateMin: false, estimateMax: false, biddingTime: false, categoryId: false
+})
 const errors = ref({
-  name: '',
-  mainImage: '',
-  startingPrice: '',
-  reservePrice: '',
-  estimateMin: '',
-  estimateMax: '',
-  biddingTime: '',
-  categoryId: ''
+  name: '', mainImage: '', startingPrice: '', reservePrice: '',
+  estimateMin: '', estimateMax: '', biddingTime: '', categoryId: ''
 })
 
 // === VALIDATE ===
@@ -375,31 +368,23 @@ const validateForm = () => {
     biddingTime: biddingTime.value >= 30 ? '' : 'Thời gian phải từ 30 giây trở lên',
     categoryId: categoryId.value !== null ? '' : 'Vui lòng chọn thể loại'
   }
-
   if (estimateMin.value !== null && estimateMax.value !== null && estimateMin.value > estimateMax.value) {
     newErrors.estimateMin = 'Ước tính min phải ≤ max'
     newErrors.estimateMax = 'Ước tính max phải ≥ min'
   }
-
   Object.keys(newErrors).forEach(key => {
     const k = key as keyof typeof touched.value
     if (!touched.value[k]) newErrors[k] = ''
   })
-
   errors.value = newErrors
 }
 
 // === WATCH ===
-watch(
-  [name, mainImage, startingPrice, reservePrice, estimateMin, estimateMax, categoryId],
-  () => validateForm()
-)
-
+watch([name, mainImage, startingPrice, reservePrice, estimateMin, estimateMax, categoryId], () => validateForm())
 watch(duration, () => updateBiddingTime(), { deep: true })
 
 // === COMPUTED ===
 const hasErrors = computed(() => Object.values(errors.value).some(err => err !== ''))
-
 const formatDuration = computed(() => {
   const d = duration.value.days || 0
   const h = duration.value.hours || 0
@@ -420,13 +405,11 @@ const onMainImageChange = (e: Event) => {
   touched.value.mainImage = true
   validateForm()
 }
-
 const onSubImagesChange = (e: Event) => {
   const files = Array.from((e.target as HTMLInputElement).files || []).slice(0, 5)
   subImages.value = files
   subImagePreviews.value = files.map(f => URL.createObjectURL(f))
 }
-
 const removeMainImage = () => {
   mainImage.value = null
   mainImagePreview.value = ''
@@ -434,7 +417,6 @@ const removeMainImage = () => {
   touched.value.mainImage = true
   validateForm()
 }
-
 const removeSubImage = (index: number) => {
   subImages.value.splice(index, 1)
   subImagePreviews.value.splice(index, 1)
@@ -462,7 +444,6 @@ onMounted(async () => {
   } catch (err) {
     console.error('Lỗi load categories:', err)
   }
-  // Mặc định 1 ngày
   duration.value = { days: 1, hours: 0, minutes: 0 }
   updateBiddingTime()
 })
@@ -472,7 +453,6 @@ const onSubmit = async () => {
   Object.keys(touched.value).forEach(k => (touched.value[k] = true))
   validateForm()
   if (hasErrors.value) return alert('Vui lòng sửa các lỗi!')
-
   if (!window.ethereum) return alert('Cài MetaMask!')
   const token = localStorage.getItem('jwt')
   if (!token) return alert('Đăng nhập trước!')
@@ -486,17 +466,36 @@ const onSubmit = async () => {
 
     const factoryAddress = '0x5FbDB2315678afecb367f032d93F642f64180aa3'
     const factoryABI = [
-      'function createAction(uint256 _biddingTime, address _seller) external',
-      'event ActionCreated(address indexed seller, address actionAddress, uint endTime)'
+      'function createAction(uint256 _biddingTime, address _seller, uint256 _startingPrice) payable',
+      'event ActionCreated(address indexed seller, address actionAddress, uint startingPrice, uint sellerDeposit, uint endTime)'
     ]
     const factory = new ethers.Contract(factoryAddress, factoryABI, signer)
-    const tx = await factory.createAction(biddingTime.value, userAddress, { gasLimit: 5000000 })
-    alert('Đang tạo hợp đồng...')
-    const receipt = await tx.wait()
-    const event = receipt.events?.find(e => e.event === 'ActionCreated')
-    if (!event?.args?.actionAddress) throw new Error('Không tìm thấy địa chỉ hợp đồng!')
 
+    // TÍNH CỌC
+    const startingPriceWei = ethers.utils.parseEther(startingPrice.value.toString())
+    const depositWei = startingPriceWei.mul(20).div(100)
+
+    // GỌI CONTRACT VỚI msg.value
+    const tx = await factory.createAction(
+      biddingTime.value,
+      userAddress,
+      startingPriceWei,
+      { value: depositWei, gasLimit: 5000000 }
+    )
+
+    alert(`Đang tạo hợp đồng... Cọc: ${ethers.utils.formatEther(depositWei)} ETH`)
+    const receipt = await tx.wait()
+
+    const iface = new ethers.utils.Interface(factoryABI);
+    const event = receipt.logs
+      .map(log => {
+        try { return iface.parseLog(log); } catch { return null; }
+      })
+      .find(e => e?.name === 'ActionCreated');
+    if (!event?.args?.actionAddress) throw new Error('Không tìm thấy địa chỉ hợp đồng!')
     const contractAddress = event.args.actionAddress
+
+    // GỬI DỮ LIỆU LÊN SERVER
     const formData = new FormData()
     const auctionData = {
       name: name.value.trim(),

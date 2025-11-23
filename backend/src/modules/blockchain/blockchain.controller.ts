@@ -207,7 +207,14 @@ export class BlockchainController {
       return []; // QUAN TRỌNG: TRẢ [] THAY VÌ 500
     }
   }
-
+  
+  // 🟢 Lấy danh sách đấu giá của user (DB)
+  @UseGuards(JwtAuthGuard)
+  @Get('my')
+  async getMyAuctions(@Req() req: any) {
+    return this.blockchainService.getMyAuctions(req.user.userId);
+  }
+  
   // 🟢 Lấy danh sách đấu giá thắng của user (DB)
   @UseGuards(JwtAuthGuard)
   @Get('my-wins')
@@ -224,5 +231,15 @@ export class BlockchainController {
     @Req() req: any,
   ) {
     return this.blockchainService.confirmReceived(req.user.id, address, txHash);
+  }
+
+  @Post(':address/confirm-shipped')
+  @UseGuards(JwtAuthGuard)
+  async confirmShipped(
+    @Req() req: any,
+    @Param('address') address: string,
+    @Body('txHash') txHash: string,
+  ) {
+    return this.blockchainService.confirmShippedBySeller(req.user.id, address, txHash);
   }
 }

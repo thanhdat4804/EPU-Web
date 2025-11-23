@@ -48,12 +48,12 @@ async function bootstrap() {
       path: '/',
     },
   })
-
+  
   // // Bỏ qua CSRF cho route upload file
   app.use((req: Request, res: Response, next: NextFunction) => {
     return csrfProtection(req, res, next)
   })
-
+  //Đây là lúc không có CSRF 
   // ========================================
   // 4. Xử lý lỗi CSRF – Trả JSON rõ ràng
   // ========================================

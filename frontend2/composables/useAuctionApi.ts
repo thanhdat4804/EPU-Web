@@ -63,6 +63,17 @@ export function useAuctionApi() {
       credentials: 'include',
     })
   }
+  // ============================================================
+  // 🟡 GET: Danh sách đấu giá của tôi
+  // ============================================================
+  const getMyAuctions = async () => {
+    const token = localStorage.getItem('jwt')
+    const res = await fetch(`${API_BASE}/my`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    if (!res.ok) throw new Error('Lỗi tải')
+    return res.json()
+  }
 
   // ============================================================
   // 🟡 POST: Tạo đấu giá mới (kèm ảnh chính + ảnh phụ)
@@ -169,6 +180,20 @@ export function useAuctionApi() {
     })
   }
 
+  // ============================================================
+  // XÁC NHẬN GIAO HÀNG (SELLER BẤM)
+  // ============================================================
+  const confirmShipped = async (address: string, txHash: string) => {
+    const jwt = getJwt()
+    if (!jwt) throw new Error('Bạn chưa đăng nhập')
+
+    return await $fetch(`${API_BASE}/${address}/confirm-shipped`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: getHeaders(),
+      body: { txHash },
+    })
+  }
   return {
     getAuctions,
     getAuctionDetail,
@@ -182,5 +207,7 @@ export function useAuctionApi() {
     refundBuyer,
     withdrawDeposit,
     penalizeWinner,
+    getMyAuctions,
+    confirmShipped,
   }
 }
