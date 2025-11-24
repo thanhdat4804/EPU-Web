@@ -13,6 +13,7 @@ import { ScheduleModule } from '@nestjs/schedule'
 // 🟢 CÁCH 2: DÙNG ServeStaticModule
 import { ServeStaticModule } from '@nestjs/serve-static'
 import { join } from 'path'
+import { FavoriteModule } from './modules/favorite/favorite.module'
 
 @Module({
   imports: [
@@ -28,7 +29,7 @@ import { join } from 'path'
     UserModule,
     CategoryModule,
     ItemModule,
-
+    FavoriteModule,
     // 3. CÁCH 2: PHỤC VỤ ẢNH TỪ THƯ MỤC uploads/
     ServeStaticModule.forRoot({
       rootPath: join(__dirname, '..', 'uploads'), // Đường dẫn tuyệt đối đến thư mục uploads/

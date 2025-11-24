@@ -23,6 +23,8 @@ model User {
   resetTokenExpire     DateTime?
   wonAuctions          AuctionWinner[] @relation("UserWonAuctions") // ✅ user thắng nhiều auction
   transactions         Transaction[]
+  favorites            FavoriteAuction[]
+  
 }
 
 model Category {
@@ -95,6 +97,7 @@ model Auction {
   winner          AuctionWinner? @relation("AuctionHasWinner") // ✅ đặt tên rõ ràng
   createdAt       DateTime  @default(now())
   buyerPaidAt     DateTime?
+  favoritedBy     FavoriteAuction[]
 }
 
 model AuctionWinner {
@@ -134,3 +137,14 @@ model Transaction {
   createdAt    DateTime  @default(now())
 }
 
+model FavoriteAuction {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  auctionId Int
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id])
+  auction   Auction  @relation(fields: [auctionId], references: [id])
+
+  @@unique([userId, auctionId]) // tránh thêm 2 lần
+}
