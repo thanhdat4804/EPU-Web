@@ -17,6 +17,13 @@
         <span>Đấu giá nào</span>
       </NuxtLink>
 
+      <NuxtLink
+        to="/user/my_auction"
+        class="ml-6 flex items-center gap-2 bg-gradient-to-r from-blue-500 to-indigo-600 text-white px-5 py-2 rounded-full font-semibold text-sm shadow-md hover:shadow-lg hover:scale-[1.03] transition-all duration-300"
+      >
+        <span>Đấu giá của tôi</span>
+      </NuxtLink>
+
       <!-- Thanh tìm kiếm -->
       <div class="flex-1 flex justify-center relative">
         <div class="relative w-full max-w-lg transition-all duration-300">
