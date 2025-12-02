@@ -1,24 +1,29 @@
 <template>
-  <div class="min-h-screen bg-gray-50">
+  <div class="min-h-screen bg-white">
     <Header />
-
-    <!-- Thanh thể loại -->
     <CategoryMenu
       :categories="categories"
       :selected="selectedCategory"
       @select="selectCategory"
     />
 
-    <div v-if="loading" class="p-6 text-center text-gray-500">Đang tải dữ liệu...</div>
-    <div v-else-if="error" class="p-6 text-center text-red-500">{{ error }}</div>
+    <!-- Loading / Error -->
+    <div v-if="loading" class="max-w-7xl mx-auto px-6 py-24 text-center text-gray-600 text-lg">
+      Đang tải các phiên đấu giá...
+    </div>
+    <div v-else-if="error" class="max-w-7xl mx-auto px-6 py-24 text-center text-red-600 text-lg">
+      {{ error }}
+    </div>
 
-    <!-- Danh sách đấu giá -->
-    <div v-else class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-6 p-6">
-      <ProductCard
-        v-for="auction in auctions"
-        :key="auction.contractAddress"
-        :auction="auction"
-      />
+    <!-- DANH SÁCH – CHỈ 4 CỘT TRÊN MÀN HÌNH LỚN → ẢNH TO NHẤT -->
+    <div v-else class="max-w-7xl mx-auto px-6 py-12">
+      <div class="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8">
+        <ProductCard
+          v-for="auction in auctions"
+          :key="auction.id || auction.contractAddress"
+          :auction="auction"
+        />
+      </div>
     </div>
   </div>
 </template>

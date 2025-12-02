@@ -11,7 +11,7 @@ class ToggleFavoriteDto {
 @UseGuards(JwtAuthGuard)
 export class FavoriteController {
   constructor(private favoriteService: FavoriteService) {}
-
+  // 🟢 THÊM ĐẤU GIÁ YÊU THÍCH
   @Post()
   async add(@Req() req, @Body('auctionId') auctionId: number) {
     // Nếu không có auctionId → trả lỗi
@@ -20,17 +20,17 @@ export class FavoriteController {
     }
     return this.favoriteService.addFavorite(req.user.id, Number(auctionId))
   }
-
+  // 🟢 XÓA ĐẤU GIÁ YÊU THÍCH
   @Delete(':auctionId')
   async remove(@Req() req, @Param('auctionId') auctionId: string) {
     return this.favoriteService.removeFavorite(req.user.id, +auctionId);
   }
-
+  // 🟢 LẤY DANH SÁCH ĐẤU GIÁ YÊU THÍCH CỦA NGƯỜI DÙNG
   @Get()
   async getMyFavorites(@Req() req) {
     return this.favoriteService.getFavorites(req.user.id);
   }
-
+  // 🟢 KIỂM TRA ĐẤU GIÁ CÓ TRONG YÊU THÍCH KHÔNG
   @Get('check/:auctionId')
   async check(@Req() req, @Param('auctionId') auctionId: string) {
     const isFav = await this.favoriteService.isFavorited(req.user.id, +auctionId);
