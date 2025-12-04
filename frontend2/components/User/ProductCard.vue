@@ -1,9 +1,9 @@
 <template>
-  <div class="relative bg-white overflow-hidden">
+  <div class="relative bg-white overflow-hidden scale-110">
     <NuxtLink :to="`/auction/${auction.contractAddress}`" class="block">
 
       <!-- Ảnh -->
-      <div class="aspect-[3/4] bg-gray-100 overflow-hidden">
+      <div class="aspect-[4/5] bg-gray-100 overflow-hidden">
         <img
           :src="getImageUrl(auction.item?.mainImage, auction.item?.imageUrl)"
           :alt="auction.item?.name"
@@ -13,16 +13,23 @@
       </div>
 
       <!-- Thông tin – sát mép, font Basis Grotesque mượt mà -->
-      <div class="pt-3 pb-5pr-4">
-        <h3 class="text-base leading-tight line-clamp-2 mb-1.5 text-gray-800" style="font-family: 'Basis Grotesque Pro', sans-serif; font-weight: 300;">
+      <div class="pt-3 pb-5 pr-4">
+        <!-- Tên sản phẩm – nhỏ hơn, thanh thoát hơn -->
+        <h3 class="text-sm leading-tight line-clamp-2 mb-1 text-gray-800" 
+            style="font-family: 'Basis Grotesque Pro', sans-serif; font-weight: 300;">
           {{ auction.item?.name || 'Đang tải...' }}
         </h3>
 
-        <div class="mt-2">
-          <p class="text-xs uppercase tracking-widest text-gray-500 mb-0.5" style="font-family: 'Basis Grotesque Pro', sans-serif; font-weight: 500;">
+        <div class="mt-1.5">
+          <!-- "Current bid" – nhỏ xíu, mỏng, đúng chuẩn Catawiki -->
+          <p class="text-[10px] uppercase tracking-widest text-gray-500 mb-0.5 leading-none" 
+            style="font-family: 'Basis Grotesque Pro', sans-serif; font-weight: 500;">
             Current bid
           </p>
-          <p class="text-2xl leading-none tracking-tight text-gray-900" style="font-family: 'Basis Grotesque Pro', sans-serif; font-weight: 650;">
+
+          <!-- Giá tiền – nhỏ lại 1 tí nhưng vẫn nổi bật -->
+          <p class="text-xl leading-none tracking-tight text-gray-900" 
+            style="font-family: 'Basis Grotesque Pro', sans-serif; font-weight: 650;">
             {{ formatPrice(currentBid) }}
           </p>
         </div>

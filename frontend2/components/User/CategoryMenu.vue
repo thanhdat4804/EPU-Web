@@ -55,7 +55,7 @@
 
           <!-- Gạch chân xanh khi active -->
           <div v-if="selected === cat.id"
-              class="absolute bottom-0 left-1/2 -translate-x-1/2 w-12 h-1 bg-blue-600 rounded-full transition-all duration-300"></div>
+              class="absolute bottom-0 left-1/2 -translate-x-1/2 w-full h-1 bg-blue-600  transition-all duration-300"></div>
         </button> 
       </div>
 
