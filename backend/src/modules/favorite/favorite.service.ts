@@ -69,4 +69,10 @@ export class FavoriteService {
     });
     return count > 0;
   }
+
+  async getFavoriteCount(auctionId: number): Promise<number> {
+    return this.prisma.favoriteAuction.count({
+      where: { auctionId },
+    });
+  }
 }
