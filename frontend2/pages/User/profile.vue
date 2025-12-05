@@ -172,7 +172,6 @@ const tabs = [
   { key: 'account', label: 'Tài khoản', icon: User },
   { key: 'addresses', label: 'Địa chỉ', icon: Home },
   { key: 'notifications', label: 'Thông báo', icon: Bell },
-  { key: 'history', label: 'Lịch sử đấu giá', icon: History },
 ]
 
 // Lấy user
