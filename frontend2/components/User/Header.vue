@@ -102,24 +102,40 @@
 
         <!-- User dropdown -->
         <template v-if="!user">
-          <NuxtLink to="/auth/login" class="text-gray-700 hover:text-blue-600">Đăng nhập</NuxtLink>
-          <NuxtLink to="/auth/register" class="bg-blue-600 text-white px-5 py-2 hover:bg-blue-700 transition rounded-md">Đăng ký</NuxtLink>
+          <NuxtLink to="/auth/login" class="text-gray-700 hover:text-blue-600 font-medium">Đăng nhập</NuxtLink>
+          <NuxtLink to="/auth/register" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-lg font-semibold shadow-md transition">
+            Đăng ký
+          </NuxtLink>
         </template>
+
         <template v-else>
           <div class="relative group">
+            <!-- Avatar + tên + mũi tên -->
             <div @click="goToProfile"
-                 class="flex items-center gap-2.5 cursor-pointer py-2 px-3 hover:bg-gray-100 transition select-none">
-              <div class="w-9 h-9 bg-blue-100 flex items-center justify-center">
-                <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                class="flex items-center gap-3 cursor-pointer py-2 px-4 hover:bg-blue-50 rounded-xl transition-all duration-200 select-none">
+              <div class="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center shadow">
+                <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                         d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                 </svg>
               </div>
-              <span class="font-medium text-gray-800">{{ user.name }}</span>
+              <span class="font-semibold text-gray-800">{{ user.name }}</span>
               <svg class="w-4 h-4 text-gray-500 transition-transform duration-200 group-hover:rotate-180"
-                   fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
               </svg>
+            </div>
+
+            <!-- DROPDOWN MENU – CHỈ 2 MỤC NHƯ BẠN YÊU CẦU -->
+            <div class="absolute top-full right-0 mt-3 w-56 bg-white border border-gray-200 shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+              <NuxtLink to="/user/profile"
+                        class="flex items-center gap-3 px-6 py-4 text-sm font-medium text-gray-700 hover:bg-blue-50 transition">
+                Trang cá nhân
+              </NuxtLink>
+              <button @click="logout"
+                      class="w-full flex items-center gap-3 px-6 py-4 text-sm font-medium text-red-600 hover:bg-red-50 transition text-left">
+                Đăng xuất
+              </button>
             </div>
           </div>
         </template>
