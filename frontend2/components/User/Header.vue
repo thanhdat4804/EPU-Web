@@ -1,11 +1,9 @@
 <template>
-  <header class="bg-white sticky top-0 z-50 shadow-sm">
+  <header class="bg-white sticky top-0 z-50 shadow-md border-b-2 border-blue-100">
     <div class="max-w-7xl mx-auto flex items-center justify-between px-6 py-4">
 
       <!-- Logo -->
-      <NuxtLink to="/auction" class="text-3xl font-bold text-blue-600 select-none">
-        BidDora
-      </NuxtLink>
+      <NuxtLink to="/auction" class="text-3xl font-bold text-blue-600 select-none">BidDora</NuxtLink>
 
       <!-- Thanh tìm kiếm -->
       <div class="flex-1 max-w-md mx-8">
@@ -25,55 +23,93 @@
             </svg>
           </div>
         </div>
-
-        <!-- Dropdown kết quả tìm kiếm -->
-        <div v-if="searchResults.length && search.trim()"
-             class="absolute left-0 right-0 mt-1 bg-white border border-gray-200 shadow-lg max-h-80 overflow-y-auto z-50 rounded-lg">
-          <div v-for="item in searchResults" :key="item.id"
-               @click="goToItem(item.id)"
-               class="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 cursor-pointer transition rounded">
-            <img :src="item.imageUrl || '/no-image.jpg'" class="w-12 h-12 object-cover rounded" alt="">
-            <div>
-              <p class="font-medium text-gray-900 truncate">{{ item.name }}</p>
-              <p class="text-sm text-gray-500">{{ formatPrice(item.currentPrice || item.startingPrice) }}</p>
-            </div>
-          </div>
-        </div>
       </div>
 
-      <!-- Right side: Nút + User -->
-      <div class="flex items-center gap-8 text-sm font-medium">
+      <!-- Right side: icons + user -->
+      <div class="flex items-center gap-6 text-sm font-medium relative">
 
-        <NuxtLink to="/auction/create" class="flex items-center gap-2 text-gray-700 hover:text-blue-600 transition">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <!-- Tạo đấu giá -->
+        <NuxtLink to="/auction/create" class="w-11 h-11 flex items-center justify-center bg-gray-100 rounded-full hover:bg-blue-100 hover:border-2 hover:border-blue-400 transition-all duration-200 group shadow-sm">
+          <svg class="w-6 h-6 text-gray-700 group-hover:text-blue-600 transition" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
           </svg>
-          <span>Đấu giá nào</span>
         </NuxtLink>
 
-        <NuxtLink to="/user/my_auction" class="flex items-center gap-2 text-gray-700 hover:text-blue-600 transition">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <!-- My Auction -->
+        <NuxtLink to="/user/my_auction" class="w-11 h-11 flex items-center justify-center bg-gray-100 rounded-full hover:bg-blue-100 hover:border-2 hover:border-blue-400 transition-all duration-200 group shadow-sm">
+          <svg class="w-6 h-6 text-gray-700 group-hover:text-blue-600 transition" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                   d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2m-6 0h6" />
           </svg>
-          <span>Đấu giá của tôi</span>
         </NuxtLink>
 
-        <!-- Chưa đăng nhập -->
+        <!-- Notification Dropdown -->
+        <div class="relative">
+          <button @click="toggleNotifications" class="relative w-11 h-11 flex items-center justify-center bg-gray-100 rounded-full hover:bg-blue-100 hover:border-2 hover:border-blue-400 transition-all duration-200 group shadow-sm">
+            <svg class="w-6 h-6 text-gray-700 group-hover:text-blue-600 transition" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6 6 0 10-12 0v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+            </svg>
+            <span v-if="unreadCount"
+                  class="absolute -top-1 -right-1 min-w-5 h-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center px-1 shadow-lg">
+              {{ unreadCount > 99 ? '99+' : unreadCount }}
+            </span>
+          </button>
+
+          <!-- Dropdown – RỘNG VỪA ĐẸP (480px), KHÔNG BO VIỀN GÓC -->
+          <div v-if="showNotifications"
+               class="absolute right-0 mt-3 w-96 lg:w-[480px] bg-white border border-gray-200 shadow-2xl overflow-hidden z-50">
+
+            <!-- Header -->
+            <div class="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-blue-50 to-cyan-50 border-b border-gray-200">
+              <h3 class="text-lg font-bold text-gray-900">Thông báo</h3>
+              <button @click="markAllRead" 
+                      class="text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline transition">
+                Đánh dấu tất cả đã đọc
+              </button>
+            </div>
+
+            <!-- Danh sách -->
+            <div class="max-h-96 overflow-y-auto">
+              <div v-if="!notifications.length" class="text-center py-12 text-gray-500">
+                <p class="text-lg">Chưa có thông báo nào</p>
+              </div>
+
+              <div v-for="notification in notifications" :key="notification.id"
+                   @click.prevent="openNotification(notification)"
+                   class="flex gap-5 px-6 py-5 hover:bg-blue-50 transition cursor-pointer border-b border-gray-100 last:border-0"
+                   :class="{ 'bg-blue-50 font-semibold': !notification.read }">
+
+                <div class="flex-shrink-0">
+                  <img :src="getNotificationImage(notification.image)"
+                       class="w-14 h-14 object-cover shadow-md"
+                       alt="Thông báo" />
+                </div>
+
+                <div class="flex-1 min-w-0">
+                  <p class="font-semibold text-gray-900 truncate text-base">{{ notification.title }}</p>
+                  <p class="text-sm text-gray-600 mt-1 line-clamp-2">{{ notification.message }}</p>
+                  <p class="text-xs text-gray-400 mt-2">{{ formatDate(notification.createdAt) }}</p>
+                </div>
+
+                <div v-if="!notification.read" class="self-start mt-1">
+                  <span class="w-3 h-3 bg-red-500 shadow-lg"></span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- User dropdown -->
         <template v-if="!user">
           <NuxtLink to="/auth/login" class="text-gray-700 hover:text-blue-600">Đăng nhập</NuxtLink>
-          <NuxtLink to="/auth/register" class="bg-blue-600 text-white px-5 py-2 hover:bg-blue-700 transition rounded-md">
-            Đăng ký
-          </NuxtLink>
+          <NuxtLink to="/auth/register" class="bg-blue-600 text-white px-5 py-2 hover:bg-blue-700 transition rounded-md">Đăng ký</NuxtLink>
         </template>
-
-        <!-- ĐÃ ĐĂNG NHẬP – FULL Dropdown Settings + Logout -->
         <template v-else>
           <div class="relative group">
-            <!-- Click vào đây → vào Profile -->
             <div @click="goToProfile"
-                 class="flex items-center gap-2.5 cursor-pointer py-2 px-3 hover:bg-gray-100 transition rounded-lg select-none">
-              <div class="w-9 h-9 bg-blue-100 rounded flex items-center justify-center">
+                 class="flex items-center gap-2.5 cursor-pointer py-2 px-3 hover:bg-gray-100 transition select-none">
+              <div class="w-9 h-9 bg-blue-100 flex items-center justify-center">
                 <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                         d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
@@ -85,117 +121,116 @@
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
               </svg>
             </div>
-
-            <!-- Dropdown khi hover -->
-            <div class="absolute top-full right-0 mt-2 w-56 bg-white border border-gray-200 shadow-xl rounded-lg 
-                            opacity-0 invisible group-hover:opacity-100 group-hover:visible 
-                            transition-all duration-300 origin-top-right scale-95 group-hover:scale-100 z-50">
-              
-              <!-- Trang cá nhân -->
-              <NuxtLink to="/user/profile" class="flex items-center gap-3 px-5 py-3 text-sm text-gray-700 hover:bg-gray-50 transition">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                </svg>
-                <span>Trang cá nhân</span>
-              </NuxtLink>
-
-              <!-- Cài đặt -->
-              <NuxtLink to="/user/settings" class="flex items-center gap-3 px-5 py-3 text-sm text-gray-700 hover:bg-gray-50 transition">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-                <span>Cài đặt</span>
-              </NuxtLink>
-
-              <div class="h-px bg-gray-200 mx-4"></div>
-
-              <!-- Đăng xuất -->
-              <button @click="logout"
-                      class="flex items-center gap-3 w-full px-5 py-3 text-sm text-red-600 hover:bg-red-50 transition">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                </svg>
-                <span>Đăng xuất</span>
-              </button>
-            </div>
           </div>
         </template>
-
       </div>
     </div>
   </header>
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
-import { useWallet } from '~/composables/useWallet'
+import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
+import { useCsrf } from '~/composables/useCsrf'
 
 const router = useRouter()
-const route = useRoute()
-const search = ref('')
-const searchResults = ref([])
+const { csrfToken, fetchCsrf } = useCsrf()
+
+const showNotifications = ref(false)
+const notifications = ref([])
+const unreadCount = ref(0)
 const user = ref(null)
-let timeout = null
 
-const { walletAddress, connectMetamask, fetchWallet } = useWallet()
+const getLocalStorageItem = (key) => process.client ? localStorage.getItem(key) : null
 
-onMounted(async () => {
-  const token = localStorage.getItem('jwt')
-  if (!token) return
-  try {
-    const userData = await $fetch('http://localhost:3001/users/me', {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-    user.value = userData
-    localStorage.setItem('user', JSON.stringify(userData))
-    await fetchWallet(userData.id)
-  } catch (err) {
-    localStorage.removeItem('jwt')
-    localStorage.removeItem('user')
+onMounted(() => {
+  const userData = getLocalStorageItem('user')
+  if (userData) {
+    try {
+      user.value = JSON.parse(userData)
+    } catch (e) {
+      user.value = null
+    }
   }
 })
 
-const handleSearch = () => {
-  clearTimeout(timeout)
-  if (!search.value.trim()) {
-    searchResults.value = []
-    return
-  }
-  timeout = setTimeout(async () => {
-    try {
-      const res = await $fetch(`http://localhost:3001/items/search/by-name?name=${encodeURIComponent(search.value)}`)
-      searchResults.value = Array.isArray(res) ? res : []
-    } catch (err) {
-      searchResults.value = []
+const getNotificationImage = (filename) => {
+  if (!filename) return '/no-image.jpg'
+  return `http://localhost:3001/uploads/${filename}`
+}
+
+const authFetch = async (url, options = {}) => {
+  if (!process.client) return
+  const token = localStorage.getItem('jwt')
+  await fetchCsrf()
+  return await $fetch(url, {
+    ...options,
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token && { Authorization: `Bearer ${token}` }),
+      'X-CSRF-Token': csrfToken.value,
+      ...options.headers
     }
-  }, 300)
+  })
 }
 
-const goToItem = (id) => {
-  search.value = ''
-  searchResults.value = []
-  router.push(`/auction/${id}`)
+const toggleNotifications = () => {
+  showNotifications.value = !showNotifications.value
+  if (showNotifications.value) fetchNotifications()
 }
 
-const goToProfile = () => {
-  router.push('/user/profile')
+const fetchNotifications = async () => {
+  if (!user.value) return
+  try {
+    const token = getLocalStorageItem('jwt')
+    const headers = token ? { Authorization: `Bearer ${token}` } : {}
+    const res = await $fetch(`http://localhost:3001/notifications/${user.value.id}`, { headers })
+    notifications.value = res || []
+    unreadCount.value = notifications.value.filter(n => !n.read).length
+  } catch (err) {
+    console.error('Lỗi tải thông báo:', err)
+    notifications.value = []
+    unreadCount.value = 0
+  }
 }
 
-const logout = () => {
-  localStorage.removeItem('jwt')
-  localStorage.removeItem('user')
-  user.value = null
-  walletAddress.value = null
-  window.location.reload()
+// ĐÃ SỬA HOÀN HẢO – BẤM CHUYỂN TRANG + ĐÓNG DROPDOWN
+const openNotification = async (notification) => {
+  if (!notification.read) {
+    try {
+      await authFetch(`http://localhost:3001/notifications/read/${notification.id}`, {
+        method: 'PATCH'
+      })
+      notification.read = true
+      unreadCount.value--
+    } catch (err) {
+      console.error('Lỗi đánh dấu đã đọc:', err)
+    }
+  }
+
+  // ĐÓNG DROPDOWN + CHUYỂN TRANG MƯỢT
+  showNotifications.value = false
+  router.push(notification.link)
 }
 
-const formatPrice = (price) => {
-  if (!price) return '—'
-  return `${Number(price).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ETH`
+const markAllRead = async () => {
+  if (!user.value) return
+  try {
+    await authFetch(`http://localhost:3001/notifications/read-all/${user.value.id}`, {
+      method: 'PATCH'
+    })
+    notifications.value.forEach(n => n.read = true)
+    unreadCount.value = 0
+  } catch (err) {
+    console.error('Lỗi đánh dấu tất cả:', err)
+  }
+}
+
+const goToProfile = () => router.push('/user/profile')
+
+const formatDate = (dateStr) => {
+  const date = new Date(dateStr)
+  return date.toLocaleDateString('vi-VN') + ' ' + date.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
 }
 </script>

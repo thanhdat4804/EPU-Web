@@ -76,6 +76,7 @@ export class ItemController {
       estimateMin: data.estimateMin ? Number(data.estimateMin) : null,
       estimateMax: data.estimateMax ? Number(data.estimateMax) : null,
       categoryId: data.categoryId ? Number(data.categoryId) : null,
+      duration: data.duration ? Number(data.duration) : null,
     })
   }
 

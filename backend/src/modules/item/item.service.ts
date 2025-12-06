@@ -1,10 +1,10 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { CreateAuctionDto } from '../blockchain/dto/create-auction.dto';
-
+import { EventEmitter2 } from '@nestjs/event-emitter';
 @Injectable()
 export class ItemService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService, private eventEmitter: EventEmitter2) {}
 
   // // ✅ Lấy tất cả Item (bao gồm category và owner)
   // async getAllItems() {
@@ -62,6 +62,7 @@ export class ItemService {
         categoryId: dto.categoryId ? Number(dto.categoryId) : null,
         ownerId: userId,
         status: 'pending',
+        duration: dto.duration, // mặc định 7 ngày
       }
     })
   }
@@ -105,14 +106,29 @@ export class ItemService {
   }
   // ADMIN: DUYỆT ITEM
   async approveItem(itemId: number) {
-    const item = await this.prisma.item.findUnique({ where: { id: itemId } });
-    if (!item) throw new NotFoundException('Item không tồn tại');
-    if (item.status !== 'pending') throw new BadRequestException('Item không ở trạng thái chờ duyệt');
-
-    return this.prisma.item.update({
+    const item = await this.prisma.item.findUnique({
       where: { id: itemId },
-      data: { status: 'approved' }
     });
+
+    if (!item) throw new NotFoundException('Item không tồn tại');
+    if (item.status !== 'pending')
+      throw new BadRequestException('Item không ở trạng thái chờ duyệt');
+
+    // cập nhật trạng thái
+    const updated = await this.prisma.item.update({
+      where: { id: itemId },
+      data: { status: 'approved' },
+    });
+
+    // 🔥 Emit event
+    this.eventEmitter.emit('item.approved', {
+      userId: item.ownerId,          // người đăng
+      itemId: item.id,
+      title: item.name,
+      image: item.mainImage ?? null,    // hoặc item.images[0] nếu bạn dùng array
+    });
+
+    return updated;
   }
   // ✅ Tìm Item theo tên (có thể trả nhiều kết quả gần giống)
   async searchItemByName(name: string) {

@@ -337,6 +337,11 @@ const subImagePreviews = ref<string[]>([])
 
 // Thời gian (giữ nguyên nhưng KHÔNG DÙNG nữa)
 const duration = ref({ days: 1, hours: 0, minutes: 0 })
+const totalDuration = computed(() => {
+  return duration.value.days * 24 * 60 +
+         duration.value.hours * 60 +
+         duration.value.minutes
+})
 const biddingTime = ref(86400)
 
 // Loading
@@ -407,6 +412,7 @@ const onSubmit = async () => {
       estimateMax: estimateMax.value || null,
       categoryId: categoryId.value || null,
       imageUrl: imageUrl.value || null,
+      duration: totalDuration.value
     }
 
     formData.append('data', JSON.stringify(itemData))

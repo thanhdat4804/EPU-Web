@@ -6,20 +6,10 @@ import {
   Param,
   Req,
   UseGuards,
-  UseInterceptors,
-  UploadedFiles,
-  BadRequestException,
-  UsePipes,
-  ValidationPipe,
   Logger,
 } from '@nestjs/common';
 import { BlockchainService } from './blockchain.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { FileFieldsInterceptor } from '@nestjs/platform-express';
-import { diskStorage } from 'multer';
-import { extname } from 'path';
-import * as fs from 'fs';
-import { CreateAuctionDto } from './dto/create-auction.dto';
 @Controller('auction')
 export class BlockchainController {
   private readonly logger = new Logger(BlockchainController.name);
@@ -121,7 +111,8 @@ export class BlockchainController {
   ) {
     return this.blockchainService.confirmReceived(req.user.id, address, txHash);
   }
-
+  
+  // 🟢 Xác nhận đã giao hàng (sau khi người thắng đã thanh toán)
   @Post(':address/confirm-shipped')
   @UseGuards(JwtAuthGuard)
   async confirmShipped(

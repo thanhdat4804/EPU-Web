@@ -11,7 +11,7 @@
         </p>
       </div>
 
-      <!-- TABS – GIỮ NGUYÊN GIAO DIỆN ĐẸP NHƯ CŨ -->
+      <!-- TABS – GIỮ NGUYÊN ĐẸP NHƯ CŨ -->
       <div class="border-b border-gray-200 mb-10">
         <div class="flex flex-wrap gap-x-8 gap-y-4 -mb-px">
           <button
@@ -50,7 +50,7 @@
         </button>
       </div>
 
-      <!-- DANH SÁCH -->
+      <!-- DANH SÁCH – ẢNH HIỂN THỊ ĐÚNG ĐƯỜNG DẪN /uploads/ -->
       <div v-else class="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
         <div
           v-for="item in displayedItems"
@@ -58,9 +58,10 @@
           class="bg-white shadow hover:shadow-lg transition-shadow duration-300 border border-gray-200 overflow-hidden"
         >
           <div class="relative h-64 bg-gray-100">
+            <!-- ĐÃ SỬA: DÙNG HÀM getImageUrl ĐỂ HIỂN THỊ ẢNH ĐÚNG -->
             <img
-              v-if="item.mainImage || item.item?.mainImage"
-              :src="item.mainImage || item.item.mainImage"
+              v-if="getImageUrl(item)"
+              :src="getImageUrl(item)"
               class="w-full h-full object-cover"
               alt=""
             />
@@ -71,7 +72,7 @@
             </div>
 
             <!-- Badge trạng thái -->
-            <div class="absolute top-3 rightolc-3">
+            <div class="absolute top-3 right-3">
               <span
                 class="px-3 py-1 text-xs font-bold text-white shadow"
                 :class="statusConfig[getItemStatus(item)]?.badge || 'bg-gray-500'"
@@ -124,7 +125,6 @@
                 Xem chi tiết
               </button>
 
-              <!-- NÚT THANH TOÁN -->
               <button
                 v-if="item.status === 'approved' && !item.auction"
                 @click="handlePayment(item)"
@@ -134,7 +134,6 @@
                 {{ isActing ? 'Đang xử lý...' : 'Thanh toán & Tạo đấu giá' }}
               </button>
 
-              <!-- NÚT XÁC NHẬN GIAO/NHẬN HÀNG -->
               <template v-else-if="canAct(item)">
                 <button
                   @click="handleAction(item)"
@@ -170,19 +169,22 @@ import { useItem } from '~/composables/useItem'
 import { useAuctionApi } from '~/composables/useAuctionApi'
 
 const router = useRouter()
+const { getMyItems } = useItem()
+const { getMyAuctions, createAuctionFromItem, confirmShipped, confirmReceived } = useAuctionApi()
 
-// 2 API RIÊNG BIỆT
-const { getMyItems } = useItem()                           // ← DÙNG CHO pending + approved
-const { getMyAuctions, createAuctionFromItem, confirmShipped, confirmReceived } = useAuctionApi() // ← DÙNG CHO CÁC TAB CŨ
-
-// ==================== STATE ====================
 const activeTab = ref('all')
-const items = ref<any[]>([])      // pending + approved
-const auctions = ref<any[]>([])   // Active, Ended, Paid, v.v.
+const items = ref<any[]>([])
+const auctions = ref<any[]>([])
 const isActing = ref(false)
 const currentUserAddress = ref<string>('')
 
-// ==================== TABS ====================
+// HÀM MỚI – SỬA ẢNH HIỂN THỊ ĐÚNG ĐƯỜNG DẪN /uploads/
+const getImageUrl = (item: any) => {
+  const image = item.mainImage || item.item?.mainImage
+  if (!image) return '/no-image.jpg'
+  return `http://localhost:3001/uploads/${image}`
+}
+
 const tabs = [
   { key: 'all', label: 'Tất cả', count: 0 },
   { key: 'pending', label: 'Chờ duyệt', count: 0 },
@@ -196,7 +198,6 @@ const tabs = [
   { key: 'PenalizedSeller', label: 'Bị phạt (bạn)', count: 0 },
 ]
 
-// ==================== STATUS BADGE ====================
 const statusConfig: any = {
   pending: { label: 'Chờ duyệt', badge: 'bg-yellow-500' },
   approved: { label: 'Đã duyệt', badge: 'bg-blue-500' },
@@ -209,7 +210,6 @@ const statusConfig: any = {
   PenalizedSeller: { label: 'Bạn bị phạt', badge: 'bg-red-600' },
 }
 
-// ==================== LOAD DỮ LIỆU ====================
 onMounted(async () => {
   await Promise.all([loadItems(), loadAuctions(), connectWallet()])
 })
@@ -246,7 +246,6 @@ const connectWallet = async () => {
   }
 }
 
-// ==================== TAB COUNTS ====================
 const updateTabCounts = () => {
   tabs.forEach(tab => {
     if (tab.key === 'all') {
@@ -261,21 +260,13 @@ const updateTabCounts = () => {
   })
 }
 
-// ==================== HIỂN THỊ THEO TAB ====================
 const displayedItems = computed(() => {
-  if (activeTab.value === 'all') {
-    return [...items.value, ...auctions.value]
-  }
-  if (activeTab.value === 'pending') {
-    return items.value.filter(i => i.status === 'pending')
-  }
-  if (activeTab.value === 'approved') {
-    return items.value.filter(i => i.status === 'approved' && !i.auction)
-  }
+  if (activeTab.value === 'all') return [...items.value, ...auctions.value]
+  if (activeTab.value === 'pending') return items.value.filter(i => i.status === 'pending')
+  if (activeTab.value === 'approved') return items.value.filter(i => i.status === 'approved' && !i.auction)
   return auctions.value.filter(a => a.status === activeTab.value)
 })
 
-// ==================== HELPER ====================
 const formatPrice = (v: any) => Number(v || 0).toFixed(4)
 const shortenAddress = (addr: string) => addr ? `${addr.slice(0, 6)}...${addr.slice(-4)}` : ''
 const formatDate = (d: string) => d ? new Date(d).toLocaleString('vi-VN', { dateStyle: 'short', timeStyle: 'short' }) : ''
@@ -301,8 +292,10 @@ const handlePayment = async (item: any) => {
     const startingPriceWei = ethers.utils.parseEther(item.startingPrice.toString())
     const depositWei = startingPriceWei.mul(20).div(100)
 
+    const biddingTime = item.duration * 60 // chuyển phút -> giây
+
     const tx = await factory.createAction(
-      7 * 24 * 60 * 60,
+      biddingTime,
       await signer.getAddress(),
       startingPriceWei,
       { value: depositWei, gasLimit: 5000000 }

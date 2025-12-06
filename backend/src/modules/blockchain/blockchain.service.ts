@@ -3,7 +3,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { ethers } from 'ethers';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { Prisma } from '@prisma/client';
-import { CreateAuctionDto } from './dto/create-auction.dto';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 @Injectable()
 export class BlockchainService {
   private provider: ethers.providers.JsonRpcProvider;
@@ -44,7 +44,7 @@ export class BlockchainService {
     'function autoRefundLosers() external',
   ];
 
-  constructor(private prisma: PrismaService) {
+  constructor(private prisma: PrismaService, private eventEmitter: EventEmitter2) {
     this.provider = new ethers.providers.JsonRpcProvider(
       process.env.RPC_URL || 'http://127.0.0.1:8545',
       { name: 'hardhat', chainId: Number(process.env.CHAIN_ID || 31337) },
@@ -140,9 +140,10 @@ export class BlockchainService {
     }
 
     // 3. TẠO AUCTION
-    const startTime = new Date()
-    const endTime = new Date(startTime.getTime() + 7 * 24 * 60 * 60 * 1000) // 7 ngày (có thể lấy từ config)
-
+    const startTime = new Date();
+    this.logger.log(`Duration:  ${item.duration} minutes`);
+    const endTime = new Date(startTime.getTime() + (item.duration ?? 0) * 60 * 1000)
+    
     const auction = await this.prisma.auction.create({
       data: {
         contractAddress,
@@ -173,13 +174,23 @@ export class BlockchainService {
   @Cron(CronExpression.EVERY_MINUTE)
   async autoFinalizeAuctions() {
     const now = new Date();
+
     const auctions = await this.prisma.auction.findMany({
-      where: { status: 'Active', endTime: { lte: now } },
+      where: { 
+        status: 'Active',
+        endTime: { lte: now }   
+      },
+      include: { item: true, seller: true },
     });
 
     for (const a of auctions) {
       try {
-        const contract = new ethers.Contract(a.contractAddress, this.auctionABI, this.adminWallet || this.provider);
+        const contract = new ethers.Contract(
+          a.contractAddress,
+          this.auctionABI,
+          this.adminWallet || this.provider
+        );
+
         const ended = await contract.ended();
         if (ended) continue;
 
@@ -188,53 +199,89 @@ export class BlockchainService {
           contract.highestBid(),
         ]);
 
+        // ===================================================
+        // 1️⃣ KHÔNG AI THẮNG (highestBidder = address zero)
+        // ===================================================
         if (highestBidder === ethers.constants.AddressZero) {
           await this.prisma.auction.update({
             where: { id: a.id },
             data: { status: 'Ended' },
           });
+
+          // 🔥 Emit event không ai thắng
+          this.eventEmitter.emit('auction.finished', {
+            auctionId: a.id,
+            sellerId: a.sellerId,
+            title: a.item.name,
+            winnerId: null,
+            image: a.item.mainImage,
+          });
+
+          this.logger.log(`Auction ended with NO WINNER: ${a.contractAddress}`);
           continue;
         }
 
+        // ===================================================
+        // 2️⃣ CÓ NGƯỜI THẮNG
+        // ===================================================
+
+        // finalize + refund losers
         const tx1 = await contract.finalize();
         await tx1.wait();
 
         const tx2 = await contract.autoRefundLosers({ gasLimit: 3_000_000 });
         await tx2.wait();
 
-        this.logger.warn(`HOÀN CỌC TỰ ĐỘNG CHO TẤT CẢ NGƯỜI THUA THÀNH CÔNG! Contract: ${a.contractAddress} | Tx: ${tx2.hash}`);
+        this.logger.warn(
+          `Refund losers success! Contract: ${a.contractAddress} | Tx: ${tx2.hash}`
+        );
 
-        // LẤY USER ID TỪ ĐỊA CHỈ VÍ
+        // Lấy user từ ví highestBidder
         const bidderUser = await this.prisma.user.findUnique({
-          where: { wallet: highestBidder},
+          where: {
+            wallet: highestBidder,
+          },
         });
 
         if (!bidderUser) {
-          this.logger.warn(`Bidder wallet not found: ${highestBidder}`);
+          this.logger.warn(`Bidder wallet not found in DB: ${highestBidder}`);
           continue;
         }
 
-        // TẠO BẢN GHI WINNER
+        // Lưu winner
         await this.prisma.auctionWinner.create({
           data: {
-            auction: { connect: { id: a.id } },
-            bidder: { connect: { id: bidderUser.id } },
+            auctionId: a.id,
+            bidderId: bidderUser.id,
             bidAmount: parseFloat(ethers.utils.formatEther(highestBid)),
           },
         });
 
-        // CẬP NHẬT AUCTION
+        // Cập nhật trạng thái auction
         await this.prisma.auction.update({
           where: { id: a.id },
           data: { status: 'Ended' },
         });
 
-        this.logger.log(`Auction finalized: ${a.contractAddress} | Winner: ${highestBidder}`);
+        this.logger.log(
+          `Auction finalized: ${a.contractAddress} | Winner: ${highestBidder}`
+        );
+
+        // 🔥 Emit event CÓ người thắng
+        this.eventEmitter.emit('auction.finished', {
+          auctionId: a.id,
+          sellerId: a.sellerId,
+          title: a.item.name,
+          winnerId: bidderUser.id,
+          image: a.item.mainImage,
+        });
+
       } catch (err: any) {
         this.logger.error(`Finalize error: ${err.message}`);
       }
     }
   }
+
 
   @Cron(CronExpression.EVERY_MINUTE)
   async autoPenalizeWinners() {

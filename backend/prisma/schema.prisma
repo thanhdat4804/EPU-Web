@@ -26,6 +26,7 @@ model User {
   wonAuctions          AuctionWinner[] @relation("UserWonAuctions") // ✅ user thắng nhiều auction
   transactions         Transaction[]
   favorites            FavoriteAuction[]
+  notification         Notification[]
   
 }
 
@@ -72,6 +73,8 @@ model Item {
   reviewResult   ReviewResult?
 
   createdAt      DateTime  @default(now())
+
+  duration       Int?
 }
 
 model ReviewResult {
@@ -150,4 +153,19 @@ model FavoriteAuction {
   auction   Auction  @relation(fields: [auctionId], references: [id])
 
   @@unique([userId, auctionId]) // tránh thêm 2 lần
+}
+
+model Notification {
+  id         Int      @id @default(autoincrement())
+  userId     Int
+  type       String
+  title      String
+  message    String
+  image      String?     // optional image
+  targetType String      // "auction", "payment", etc.
+  targetId   Int
+  isRead     Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  link       String
+  user User @relation(fields: [userId], references: [id])
 }

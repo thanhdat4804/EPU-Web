@@ -9,17 +9,17 @@ import { UserModule } from './modules/user/user.module'
 import { CategoryModule } from './modules/category/category.module'
 import { ItemModule } from './modules/item/item.module'
 import { ScheduleModule } from '@nestjs/schedule'
-
+import { NotificationModule } from './modules/notification/notification.module'
 // 🟢 CÁCH 2: DÙNG ServeStaticModule
 import { ServeStaticModule } from '@nestjs/serve-static'
 import { join } from 'path'
 import { FavoriteModule } from './modules/favorite/favorite.module'
-
+import { EventEmitterModule } from '@nestjs/event-emitter';
 @Module({
   imports: [
     // 1. Schedule
     ScheduleModule.forRoot(),
-
+    EventEmitterModule.forRoot(),
     // 2. Core Modules
     PrismaModule,
     BlockchainModule,
@@ -30,6 +30,7 @@ import { FavoriteModule } from './modules/favorite/favorite.module'
     CategoryModule,
     ItemModule,
     FavoriteModule,
+    NotificationModule,
     // 3. CÁCH 2: PHỤC VỤ ẢNH TỪ THƯ MỤC uploads/
     ServeStaticModule.forRoot({
       rootPath: join(__dirname, '..', 'uploads'), // Đường dẫn tuyệt đối đến thư mục uploads/
