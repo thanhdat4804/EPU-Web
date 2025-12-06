@@ -3,7 +3,13 @@
     <div class="max-w-7xl mx-auto flex items-center justify-between px-6 py-4">
 
       <!-- Logo -->
-      <NuxtLink to="/auction" class="text-3xl font-bold text-blue-600 select-none">BidDora</NuxtLink>
+      <NuxtLink to="/auction" class="flex items-center select-none">
+        <img
+          src="/public/logo.jpg"                 
+          alt="BidDora - Đấu giá trực tuyến"
+          class="h-12 md:h-16 w-auto object-contain transition-transform duration-300 hover:scale-110"
+        />
+      </NuxtLink>
 
       <!-- Thanh tìm kiếm -->
       <div class="flex-1 max-w-md mx-8">
