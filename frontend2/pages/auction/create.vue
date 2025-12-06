@@ -310,13 +310,15 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
-import { ethers } from 'ethers'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { useAuctionApi } from '~/composables/useAuctionApi'
 import Header from '~/components/User/Header.vue'
+import { useItem } from '~/composables/useItem' // ← DÙNG useItem ĐÃ CÓ CSRF + JWT
 
-// === REFS ===
+const router = useRouter()
+const { createItem } = useItem() // ← CHỈ DÙNG createItem
+
+// === REFS – GIỮ NGUYÊN NHƯ CŨ ===
 const name = ref('')
 const description = ref('')
 const imageUrl = ref('')
@@ -326,202 +328,98 @@ const estimateMin = ref<number | null>(null)
 const estimateMax = ref<number | null>(null)
 const categoryId = ref<number | null>(null)
 const categories = ref<{ id: number; name: string }[]>([])
-const isCreating = ref(false)
 
-// ẢNH
+// Ảnh
 const mainImage = ref<File | null>(null)
 const subImages = ref<File[]>([])
 const mainImagePreview = ref('')
 const subImagePreviews = ref<string[]>([])
-const mainImageInput = ref<HTMLInputElement | null>(null)
-const subImagesInput = ref<HTMLInputElement | null>(null)
 
-// THỜI GIAN
+// Thời gian (giữ nguyên nhưng KHÔNG DÙNG nữa)
 const duration = ref({ days: 1, hours: 0, minutes: 0 })
 const biddingTime = ref(86400)
 
-// CỌC 20%
-const sellerDeposit = computed(() => {
-  if (!startingPrice.value) return 0
-  return startingPrice.value * 0.2
-})
-
-// TOUCHED & ERRORS
-const touched = ref({
-  name: false, mainImage: false, startingPrice: false, reservePrice: false,
-  estimateMin: false, estimateMax: false, biddingTime: false, categoryId: false
-})
-const errors = ref({
-  name: '', mainImage: '', startingPrice: '', reservePrice: '',
-  estimateMin: '', estimateMax: '', biddingTime: '', categoryId: ''
-})
-
-// === VALIDATE ===
-const validateForm = () => {
-  const newErrors = {
-    name: name.value.trim() ? '' : 'Vui lòng nhập tên đấu giá',
-    mainImage: mainImage.value ? '' : 'Vui lòng chọn ảnh chính',
-    startingPrice: startingPrice.value > 0 ? '' : 'Giá khởi điểm phải lớn hơn 0',
-    reservePrice: reservePrice.value === null || reservePrice.value >= 0 ? '' : 'Giá sàn không hợp lệ',
-    estimateMin: estimateMin.value === null || estimateMin.value >= 0 ? '' : 'Ước tính min không hợp lệ',
-    estimateMax: estimateMax.value === null || estimateMax.value >= 0 ? '' : 'Ước tính max không hợp lệ',
-    biddingTime: biddingTime.value >= 30 ? '' : 'Thời gian phải từ 30 giây trở lên',
-    categoryId: categoryId.value !== null ? '' : 'Vui lòng chọn thể loại'
-  }
-  if (estimateMin.value !== null && estimateMax.value !== null && estimateMin.value > estimateMax.value) {
-    newErrors.estimateMin = 'Ước tính min phải ≤ max'
-    newErrors.estimateMax = 'Ước tính max phải ≥ min'
-  }
-  Object.keys(newErrors).forEach(key => {
-    const k = key as keyof typeof touched.value
-    if (!touched.value[k]) newErrors[k] = ''
-  })
-  errors.value = newErrors
-}
-
-// === WATCH ===
-watch([name, mainImage, startingPrice, reservePrice, estimateMin, estimateMax, categoryId], () => validateForm())
-watch(duration, () => updateBiddingTime(), { deep: true })
-
-// === COMPUTED ===
-const hasErrors = computed(() => Object.values(errors.value).some(err => err !== ''))
-const formatDuration = computed(() => {
-  const d = duration.value.days || 0
-  const h = duration.value.hours || 0
-  const m = duration.value.minutes || 0
-  const parts: string[] = []
-  if (d > 0) parts.push(`${d} ngày`)
-  if (h > 0) parts.push(`${h} giờ`)
-  if (m > 0) parts.push(`${m} phút`)
-  return parts.length ? parts.join(' ') : '0 phút'
-})
-
-// === ẢNH ===
-const onMainImageChange = (e: Event) => {
-  const file = (e.target as HTMLInputElement).files?.[0]
-  if (!file) return
-  mainImage.value = file
-  mainImagePreview.value = URL.createObjectURL(file)
-  touched.value.mainImage = true
-  validateForm()
-}
-const onSubImagesChange = (e: Event) => {
-  const files = Array.from((e.target as HTMLInputElement).files || []).slice(0, 5)
-  subImages.value = files
-  subImagePreviews.value = files.map(f => URL.createObjectURL(f))
-}
-const removeMainImage = () => {
-  mainImage.value = null
-  mainImagePreview.value = ''
-  if (mainImageInput.value) mainImageInput.value.value = ''
-  touched.value.mainImage = true
-  validateForm()
-}
-const removeSubImage = (index: number) => {
-  subImages.value.splice(index, 1)
-  subImagePreviews.value.splice(index, 1)
-}
-
-// === THỜI GIAN ===
-const updateBiddingTime = () => {
-  const total = (duration.value.days || 0) * 86400 +
-                (duration.value.hours || 0) * 3600 +
-                (duration.value.minutes || 0) * 60
-  biddingTime.value = Math.max(total, 0)
-  validateForm()
-}
-
-// === API & ROUTER ===
-const router = useRouter()
-const { createAuction } = useAuctionApi()
+// Loading
+const isCreating = ref(false)
 
 // === LOAD CATEGORIES ===
 onMounted(async () => {
   try {
     const res = await fetch('http://localhost:3001/categories')
-    if (!res.ok) throw new Error('Không thể tải danh sách thể loại')
+    if (!res.ok) throw new Error()
     categories.value = await res.json()
   } catch (err) {
     console.error('Lỗi load categories:', err)
   }
-  duration.value = { days: 1, hours: 0, minutes: 0 }
-  updateBiddingTime()
 })
 
-// === SUBMIT ===
+// === XỬ LÝ ẢNH – GIỮ NGUYÊN ===
+const onMainImageChange = (e: Event) => {
+  const file = (e.target as HTMLInputElement).files?.[0]
+  if (!file) return
+  mainImage.value = file
+  mainImagePreview.value = URL.createObjectURL(file)
+}
+
+const onSubImagesChange = (e: Event) => {
+  const files = Array.from((e.target as HTMLInputElement).files || []).slice(0, 5)
+  subImages.value = files
+  subImagePreviews.value = files.map(f => URL.createObjectURL(f))
+}
+
+const removeMainImage = () => {
+  mainImage.value = null
+  mainImagePreview.value = ''
+}
+
+const removeSubImage = (index: number) => {
+  subImages.value.splice(index, 1)
+  subImagePreviews.value.splice(index, 1)
+}
+
+// === VALIDATE – GIỮ NGUYÊN NHƯ CŨ ===
+const errors = ref({
+  name: '', mainImage: '', startingPrice: '', categoryId: ''
+})
+const validateForm = () => {
+  errors.value.name = name.value.trim() ? '' : 'Vui lòng nhập tên đấu giá'
+  errors.value.mainImage = mainImage.value ? '' : 'Vui lòng chọn ảnh chính'
+  errors.value.startingPrice = startingPrice.value > 0 ? '' : 'Giá khởi điểm phải lớn hơn 0'
+  errors.value.categoryId = categoryId.value ? '' : 'Vui lòng chọn thể loại'
+}
+const hasErrors = computed(() => Object.values(errors.value).some(e => e !== ''))
+
+// === SUBMIT – CHỈ GỌI createItem → TẠO PENDING, KHÔNG TẠO AUCTION ===
 const onSubmit = async () => {
-  Object.keys(touched.value).forEach(k => (touched.value[k] = true))
   validateForm()
   if (hasErrors.value) return alert('Vui lòng sửa các lỗi!')
-  if (!window.ethereum) return alert('Cài MetaMask!')
-  const token = localStorage.getItem('jwt')
-  if (!token) return alert('Đăng nhập trước!')
 
   isCreating.value = true
   try {
-    const provider = new ethers.providers.Web3Provider(window.ethereum)
-    await provider.send('eth_requestAccounts', [])
-    const signer = provider.getSigner()
-    const userAddress = await signer.getAddress()
-
-    const factoryAddress = '0x5FbDB2315678afecb367f032d93F642f64180aa3'
-    const factoryABI = [
-      'function createAction(uint256 _biddingTime, address _seller, uint256 _startingPrice) payable',
-      'event ActionCreated(address indexed seller, address actionAddress, uint startingPrice, uint sellerDeposit, uint endTime)'
-    ]
-    const factory = new ethers.Contract(factoryAddress, factoryABI, signer)
-
-    // TÍNH CỌC
-    const startingPriceWei = ethers.utils.parseEther(startingPrice.value.toString())
-    const depositWei = startingPriceWei.mul(20).div(100)
-
-    // GỌI CONTRACT VỚI msg.value
-    const tx = await factory.createAction(
-      biddingTime.value,
-      userAddress,
-      startingPriceWei,
-      { value: depositWei, gasLimit: 5000000 }
-    )
-
-    alert(`Đang tạo hợp đồng... Cọc: ${ethers.utils.formatEther(depositWei)} ETH`)
-    const receipt = await tx.wait()
-
-    const iface = new ethers.utils.Interface(factoryABI);
-    const event = receipt.logs
-      .map(log => {
-        try { return iface.parseLog(log); } catch { return null; }
-      })
-      .find(e => e?.name === 'ActionCreated');
-    if (!event?.args?.actionAddress) throw new Error('Không tìm thấy địa chỉ hợp đồng!')
-    const contractAddress = event.args.actionAddress
-
-    // GỬI DỮ LIỆU LÊN SERVER
     const formData = new FormData()
-    const auctionData = {
+
+    const itemData = {
       name: name.value.trim(),
       description: description.value || null,
-      imageUrl: imageUrl.value || null,
       startingPrice: startingPrice.value,
-      reservePrice: reservePrice.value ?? null,
-      estimateMin: estimateMin.value ?? null,
-      estimateMax: estimateMax.value ?? null,
-      duration: biddingTime.value,
-      categoryId: categoryId.value!,
-      contractAddress,
+      reservePrice: reservePrice.value || null,
+      estimateMin: estimateMin.value || null,
+      estimateMax: estimateMax.value || null,
+      categoryId: categoryId.value || null,
+      imageUrl: imageUrl.value || null,
     }
-    formData.append('data', JSON.stringify(auctionData))
+
+    formData.append('data', JSON.stringify(itemData))
+
     if (mainImage.value) formData.append('mainImage', mainImage.value)
     subImages.value.forEach(f => formData.append('subImages', f))
 
-    const result = await createAuction(formData)
-    if (result?.contractAddress) {
-      alert('Tạo đấu giá thành công!')
-      router.push(`/auction/${result.contractAddress}`)
-    } else {
-      throw new Error('Lỗi server')
-    }
+    await createItem(formData)
+
+    alert('Gửi duyệt thành công! Vui lòng chờ Admin duyệt.')
+    router.push('/my-items') // ← Chuyển sang trang My Items để xem trạng thái
   } catch (err: any) {
-    alert(`Lỗi: ${err.message || 'Không xác định'}`)
+    alert('Lỗi: ' + (err.message || 'Không thể gửi duyệt'))
   } finally {
     isCreating.value = false
   }

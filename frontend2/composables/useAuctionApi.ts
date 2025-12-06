@@ -78,15 +78,19 @@ export function useAuctionApi() {
   // ============================================================
   // 🟡 POST: Tạo đấu giá mới (kèm ảnh chính + ảnh phụ)
   // ============================================================
-  const createAuction = async (formData: FormData) => {
+  const createAuctionFromItem = async (itemId: number, contractAddress: string, txHash: string) => {
     const jwt = getJwt()
-    if (!jwt) throw new Error('User not logged in')
+    if (!jwt) throw new Error('Bạn chưa đăng nhập')
 
-    return await $fetch(`${API_BASE}/create`, {
+    return await $fetch(`${API_BASE}/create-from-item`, {
       method: 'POST',
-      headers: getHeaders(true),
+      headers: getHeaders(),
       credentials: 'include',
-      body: formData,
+      body: {
+        itemId,
+        contractAddress,
+        txHash
+      }
     })
   }
 
@@ -199,7 +203,7 @@ export function useAuctionApi() {
     getAuctionDetail,
     getAllBids,
     getMyWinningAuctions,
-    createAuction,
+    createAuctionFromItem,
     recordBid,
     recordPayment,
     confirmReceived,

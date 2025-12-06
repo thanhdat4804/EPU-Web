@@ -37,124 +37,13 @@ export class BlockchainController {
     return this.blockchainService.getAuctionDetail(address);
   }
 
-  @Post('create')
+  @Post('create-from-item')
   @UseGuards(JwtAuthGuard)
-  @UsePipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
-  @UseInterceptors(
-    FileFieldsInterceptor(
-      [
-        { name: 'mainImage', maxCount: 1 },
-        { name: 'subImages', maxCount: 5 },
-      ],
-      {
-        limits: {
-          fileSize: 10 * 1024 * 1024, // 10MB mỗi file
-          files: 6, // 1 + 5
-        },
-        storage: diskStorage({
-          destination: './uploads',
-          filename: (req, file, cb) => {
-            const unique = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-            const ext = extname(file.originalname);
-            cb(null, `${unique}${ext}`);
-          },
-        }),
-        fileFilter: (req, file, cb) => {
-          if (file.mimetype.startsWith('image/')) {
-            cb(null, true);
-          } else {
-            cb(new BadRequestException('Chỉ chấp nhận file ảnh!'), false);
-          }
-        },
-      },
-    ),
-  )
-  async createAuction(
-    @UploadedFiles()
-    files: { mainImage?: Express.Multer.File[]; subImages?: Express.Multer.File[] },
-    @Body('data') rawData: string,
+  async createFromItem(
     @Req() req: Request & { user: { id: number } },
+    @Body() body: { itemId: number; contractAddress: string; txHash: string }
   ) {
-    // === 1. PARSE JSON ===
-    if (!rawData) {
-      throw new BadRequestException('Thiếu dữ liệu form');
-    }
-
-    let data: any;
-    try {
-      data = JSON.parse(rawData);
-    } catch (err) {
-      throw new BadRequestException('Dữ liệu JSON không hợp lệ');
-    }
-
-    // === 2. LẤY ẢNH ===
-    const mainImagePath = files.mainImage?.[0]?.filename;
-    const subImagePaths = files.subImages?.map((f) => f.filename) || [];
-
-    if (!mainImagePath) {
-      throw new BadRequestException('Vui lòng tải lên ảnh chính');
-    }
-
-    // === 3. CHUẨN HÓA + VALIDATE DỮ LIỆU ===
-    const startingPrice = Number(data.startingPrice);
-    const reservePrice = data.reservePrice != null ? Number(data.reservePrice) : null;
-    const duration = Number(data.duration);
-    const categoryId = data.categoryId != null ? Number(data.categoryId) : undefined;
-
-    const estimateMin = data.estimateMin != null ? Number(data.estimateMin) : null;
-    const estimateMax = data.estimateMax != null ? Number(data.estimateMax) : null;
-
-    // Validate số
-    if (isNaN(startingPrice) || startingPrice <= 0) {
-      throw new BadRequestException('Giá khởi điểm phải là số dương');
-    }
-    if (reservePrice !== null && (isNaN(reservePrice) || reservePrice < 0)) {
-      throw new BadRequestException('Giá sàn không hợp lệ');
-    }
-    if (isNaN(duration) || duration < 30) {
-      throw new BadRequestException('Thời gian đấu giá tối thiểu 30 giây');
-    }
-    if (categoryId !== undefined && (isNaN(categoryId) || categoryId <= 0)) {
-      throw new BadRequestException('Thể loại không hợp lệ');
-    }
-    if (estimateMin !== null && isNaN(estimateMin)) {
-      throw new BadRequestException('estimateMin không hợp lệ');
-    }
-    if (estimateMax !== null && isNaN(estimateMax)) {
-      throw new BadRequestException('estimateMax không hợp lệ');
-    }
-    if (estimateMin !== null && estimateMax !== null && estimateMin > estimateMax) {
-      throw new BadRequestException('estimateMin phải nhỏ hơn hoặc bằng estimateMax');
-    }
-
-    // === 4. TẠO DTO CHO SERVICE ===
-    const dto: CreateAuctionDto = {
-      name: data.name?.trim() || '',
-      description: data.description?.trim(),
-      imageUrl: data.imageUrl?.trim() || null,
-      startingPrice,
-      reservePrice,
-      estimateMin,
-      estimateMax,
-      mainImage: mainImagePath,
-      subImages: subImagePaths,
-      categoryId,
-      duration,
-      contractAddress: data.contractAddress,
-      // KHÔNG GỬI ownerId → service dùng req.user.id
-    };
-
-    // === 5. GỌI SERVICE ===
-    const result = await this.blockchainService.createAuction(dto, req.user.id);
-
-    // === 6. TRẢ VỀ KẾT QUẢ ===
-    return {
-      success: true,
-      message: 'Tạo đấu giá thành công!',
-      contractAddress: result.contractAddress,
-      auctionId: result.id,
-      redirectUrl: `/auction/${result.contractAddress}`,
-    };
+    return this.blockchainService.createAuctionFromApprovedItem(req.user.id, body)
   }
 
   // 🟢 Ghi nhận giao dịch đặt giá (MetaMask đã thực hiện on-chain)

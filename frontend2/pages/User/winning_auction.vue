@@ -1,30 +1,33 @@
 <template>
-  <div class="min-h-screen bg-gradient-to-br from-blue-50 via-sky-50 to-white">
+  <div class="min-h-screen bg-white">
     <Header />
-    <div class="max-w-7xl mx-auto p-6">
-      <!-- TITLE -->
-      <div class="mb-8 text-center">
-        <h1 class="text-5xl font-bold text-blue-900 flex items-center justify-center gap-4">
-          <span class="text-6xl">Các phiên bạn đã thắng</span>
+
+    <div class="max-w-7xl mx-auto px-6 py-12">
+      <!-- TITLE – GIỐNG CATAWIKI 100% -->
+      <div class="mb-12 text-center">
+        <h1 class="text-5xl font-bold text-blue-900 tracking-tight">
+          Các phiên bạn đã thắng
         </h1>
-        <p class="text-blue-600 mt-2 text-lg">Theo dõi trạng thái thanh toán và nhận hàng</p>
+        <p class="mt-3 text-lg text-blue-600">
+          Theo dõi trạng thái thanh toán và nhận hàng
+        </p>
       </div>
 
       <!-- LOADING -->
-      <div v-if="loading" class="text-center py-20">
-        <div class="inline-block animate-spin rounded-full h-16 w-16 border-8 border-blue-600 border-t-transparent"></div>
+      <div v-if="loading" class="text-center py-24">
+        <div class="inline-block animate-spin rounded-full h-16 w-16 border-4 border-blue-600 border-t-transparent"></div>
         <p class="mt-4 text-xl text-gray-600">Đang tải chiến thắng của bạn...</p>
       </div>
 
-      <!-- DANH SÁCH -->
-      <div v-else-if="auctions.length" class="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+      <!-- DANH SÁCH – VUÔNG VỨC, ĐẸP NHƯ CATAWIKI -->
+      <div v-else-if="auctions.length" class="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
         <div
           v-for="a in auctions"
           :key="a.contractAddress"
-          class="bg-white/95 backdrop-blur-xl shadow-xl border border-blue-100/50 rounded-2xl overflow-hidden hover:shadow-2xl transition-all duration-300"
+          class="bg-white shadow hover:shadow-lg transition-shadow duration-300 border border-gray-200 overflow-hidden"
         >
-          <!-- ẢNH + TRẠNG THÁI -->
-          <div class="relative h-56 bg-gradient-to-br from-blue-100 to-cyan-100">
+          <!-- ẢNH + BADGE TRẠNG THÁI -->
+          <div class="relative h-64 bg-gray-100">
             <img
               v-if="a.item?.mainImage"
               :src="a.item.mainImage"
@@ -32,104 +35,107 @@
               alt="Vật phẩm"
             />
             <div v-else class="flex items-center justify-center h-full">
-              <span class="text-7xl text-blue-300">Trophy</span>
+              <svg class="w-20 h-20 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 16a2 2 0 012.828 0L20 16m-6-4v1" />
+              </svg>
             </div>
-            <!-- BADGE TRẠNG THÁI -->
-            <div class="absolute top-3 right-3 px-4 py-2 rounded-full text-white font-bold text-sm shadow-lg"
-                 :class="statusConfig[a.status]?.badge || 'bg-gray-500'">
-              {{ statusConfig[a.status]?.label || a.status }}
+
+            <!-- Badge trạng thái – vuông, nhỏ, đẹp -->
+            <div class="absolute top-3 right-3">
+              <span
+                class="px-3 py-1 text-xs font-bold text-white shadow"
+                :class="statusConfig[a.status]?.badge || 'bg-gray-500'"
+              >
+                {{ statusConfig[a.status]?.label || a.status }}
+              </span>
             </div>
           </div>
 
           <!-- NỘI DUNG -->
           <div class="p-6">
-            <h3 class="font-bold text-xl text-gray-900 line-clamp-1">{{ a.item?.name }}</h3>
-            <p class="text-sm text-gray-600 mt-1 line-clamp-2">{{ a.item?.description || 'Không có mô tả' }}</p>
+            <h3 class="font-bold text-lg text-gray-900 line-clamp-2 leading-tight mb-3">
+              {{ a.item?.name }}
+            </h3>
+            <p class="text-sm text-gray-600 line-clamp-2 mb-5">
+              {{ a.item?.description || 'Không có mô tả' }}
+            </p>
 
             <!-- GIÁ THẮNG -->
-            <div class="mt-5 flex justify-between items-center">
+            <div class="flex items-end justify-between mb-6">
               <div>
-                <p class="text-xs text-gray-500">Giá thắng</p>
-                <p class="font-bold text-2xl text-emerald-600">
+                <p class="text-xs text-gray-500 uppercase tracking-wider">Giá thắng</p>
+                <p class="text-2xl font-bold text-gray-900 mt-1">
                   {{ formatEth(a.winningBid) }}
                 </p>
               </div>
               <div class="text-right">
                 <p class="text-xs text-gray-500">Seller nhận</p>
-                <p class="font-mono text-sm text-blue-700">
+                <p class="font-mono text-sm text-blue-600 font-semibold">
                   {{ formatEth(a.winningBid * 0.9) }}
                 </p>
               </div>
             </div>
 
             <!-- THỜI GIAN -->
-            <div class="mt-4 flex justify-between text-xs text-gray-500">
-              <div>
-                <span>Kết thúc:</span>
-                <span class="font-medium ml-1">{{ formatDate(a.endTime) }}</span>
-              </div>
+            <div class="text-sm text-gray-600 mb-6">
+              <span class="text-xs text-gray-500">Kết thúc:</span>
+              <span class="font-medium ml-1">{{ formatDate(a.endTime) }}</span>
             </div>
 
-            <!-- NÚT HÀNH ĐỘNG – ĐÃ ĐƯỢC CẬP NHẬT HOÀN TOÀN -->
-            <div class="mt-6 flex gap-3">
-              <!-- 1. Chưa thanh toán -->
+            <!-- NÚT HÀNH ĐỘNG – VUÔNG, ĐẸP, KHÔNG BO TRÒN -->
+            <div class="flex gap-3">
               <button
                 v-if="a.status === 'Ended'"
                 @click="payRemaining(a)"
                 :disabled="paying"
-                class="flex-1 py-3 px-5 bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white font-bold rounded-xl shadow-lg transition-all disabled:opacity-60"
+                class="flex-1 py-3 bg-orange-500 hover:bg-orange-600 text-white font-bold transition disabled:opacity-60"
               >
                 {{ paying ? 'Đang gửi...' : `Thanh toán ${formatEth(a.winningBid * 0.9)}` }}
               </button>
 
-              <!-- 2. Đã thanh toán → Chờ seller giao hàng -->
               <div
                 v-else-if="a.status === 'Paid'"
-                class="flex-1 py-3 text-center bg-blue-100 text-blue-700 font-bold rounded-xl"
+                class="flex-1 py-3 text-center bg-blue-100 text-blue-700 font-bold"
               >
                 Chờ seller giao hàng
               </div>
 
-              <!-- 3. Đã giao hàng → Buyer bấm xác nhận (TRẠNG THÁI MỚI) -->
               <button
                 v-else-if="a.status === 'Shipped'"
                 @click="confirmReceived(a)"
                 :disabled="confirming"
-                class="flex-1 py-3 px-5 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-bold rounded-xl shadow-lg transition-all animate-pulse"
+                class="flex-1 py-3 bg-green-600 hover:bg-green-700 text-white font-bold transition"
               >
                 {{ confirming ? 'Đang xác nhận...' : 'Đã nhận hàng – Xác nhận OK' }}
               </button>
 
-              <!-- 4. Hoàn tất -->
               <div
                 v-else-if="a.status === 'Completed'"
-                class="flex-1 py-3 text-center bg-green-100 text-green-700 font-bold rounded-xl"
+                class="flex-1 py-3 text-center bg-green-100 text-green-700 font-bold"
               >
                 Hoàn tất – Tiền đã về seller
               </div>
 
-              <!-- 5. Seller bị phạt -->
               <div
                 v-else-if="a.status === 'PenalizedSeller'"
-                class="flex-1 py-3 text-center bg-purple-100 text-purple-700 font-bold rounded-xl"
+                class="flex-1 py-3 text-center bg-purple-100 text-purple-700 font-bold"
               >
                 Seller bị phạt – Bạn được hoàn tiền + cọc
               </div>
 
-              <!-- 6. Buyer bị phạt (hiếm) -->
               <div
                 v-else-if="a.status === 'Penalized'"
-                class="flex-1 py-3 text-center bg-red-100 text-red-700 font-bold rounded-xl"
+                class="flex-1 py-3 text-center bg-red-100 text-red-700 font-bold"
               >
                 Bạn bị phạt do không thanh toán
               </div>
             </div>
 
             <!-- XEM CHI TIẾT -->
-            <div class="mt-4 text-center">
+            <div class="mt-5 text-center">
               <button
                 @click="$router.push(`/auction/${a.contractAddress}`)"
-                class="text-blue-600 hover:text-blue-800 font-medium text-sm underline"
+                class="text-blue-600 hover:text-blue-800 font-medium text-sm"
               >
                 Xem chi tiết phiên →
               </button>

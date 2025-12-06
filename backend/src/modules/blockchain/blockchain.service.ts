@@ -108,66 +108,67 @@ export class BlockchainService {
   // ============================================================
   // ADMIN / SERVER-SIDE ACTIONS
   // ============================================================
-  async createAuction(dto: CreateAuctionDto, userId: number) {
-    const {
-      name, description, imageUrl, startingPrice, reservePrice, estimateMin, estimateMax,
-      mainImage, subImages = [], categoryId, duration, contractAddress,
-    } = dto;
+  async createAuctionFromApprovedItem(
+    userId: number,
+    data: {
+      itemId: number
+      contractAddress: string
+      txHash: string
+    }
+  ) {
+    const { itemId, contractAddress, txHash } = data
 
-    // === 1. KIỂM TRA USER + WALLET ===
-    const seller = await this.prisma.user.findUnique({
-      where: { id: userId },
-      select: { id: true, wallet: true },
-    });
-    if (!seller) throw new NotFoundException('Người dùng không tồn tại');
-    if (!seller.wallet) throw new NotFoundException('Ví chưa thiết lập');
+    // 1. KIỂM TRA ITEM CÓ TỒN TẠI + ĐÃ ĐƯỢC DUYỆT + CHƯA CÓ AUCTION
+    const item = await this.prisma.item.findUnique({
+      where: { id: itemId },
+      include: { auction: true, owner: true }
+    })
 
-    // === 2. KIỂM TRA CONTRACT ĐÃ TỒN TẠI TRÊN CHAIN (chỉ cần code !== 0x) ===
+    if (!item) throw new NotFoundException('Item không tồn tại')
+    if (item.ownerId !== userId) throw new ForbiddenException('Không phải chủ sở hữu')
+    if (item.status !== 'approved') throw new BadRequestException('Item chưa được duyệt')
+    if (item.auction) throw new BadRequestException('Item đã được tạo đấu giá rồi')
+
+    // 2. KIỂM TRA CONTRACT THẬT SỰ TỒN TẠI TRÊN CHAIN
     try {
-      const code = await this.provider.getCode(contractAddress);
+      const code = await this.provider.getCode(contractAddress)
       if (code === '0x' || code === '0x0') {
-        throw new BadRequestException('Hợp đồng chưa được triển khai');
+        throw new BadRequestException('Hợp đồng chưa được triển khai')
       }
-    } catch {
-      throw new BadRequestException('Địa chỉ hợp đồng không hợp lệ');
+    } catch (err) {
+      throw new BadRequestException('Địa chỉ hợp đồng không hợp lệ')
     }
 
-    // === 3. TÍNH THỜI GIAN ===
-    const startTime = new Date();
-    const endTime = new Date(startTime.getTime() + duration * 1000);
+    // 3. TẠO AUCTION
+    const startTime = new Date()
+    const endTime = new Date(startTime.getTime() + 7 * 24 * 60 * 60 * 1000) // 7 ngày (có thể lấy từ config)
 
-    // === 4. TẠO AUCTION + ITEM ===
-    return this.prisma.auction.create({
+    const auction = await this.prisma.auction.create({
       data: {
         contractAddress,
         startTime,
         endTime,
         status: 'Active',
         seller: { connect: { id: userId } },
-        item: {
-          create: {
-            name: name.trim(),
-            description: description?.trim() || null,
-            imageUrl: imageUrl || null,
-            startingPrice,
-            reservePrice: reservePrice ?? null,
-            estimateMin: estimateMin ?? null,
-            estimateMax: estimateMax ?? null,
-            mainImage,
-            subImages,
-            owner: { connect: { id: userId } },
-            status: 'pending',
-            ...(categoryId !== undefined && { category: { connect: { id: categoryId } } }),
-          },
-        },
+        item: { connect: { id: itemId } },
       },
       include: {
-        item: { include: { category: true, owner: { select: { id: true, name: true } } } },
-        seller: { select: { id: true, name: true, wallet: true } },
-      },
-    });
+        item: {
+          include: {
+            category: true,
+            owner: { select: { id: true, name: true, wallet: true } }
+          }
+        },
+        seller: { select: { id: true, name: true, wallet: true } }
+      }
+    })
+    await this.prisma.item.update({
+      where: { id: itemId },
+      data: { status: 'active' } 
+    })
+    return auction
   }
-
+  
   //Cron job tự động finalize auctions đã kết thúc
   @Cron(CronExpression.EVERY_MINUTE)
   async autoFinalizeAuctions() {

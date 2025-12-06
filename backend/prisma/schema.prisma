@@ -63,7 +63,8 @@ model Item {
   auction        Auction?
 
   status         String    @default("pending") // pending | approved | rejected
-
+  
+  rejectReason  String?
   // 🔹 Thể loại
   category       Category? @relation(fields: [categoryId], references: [id])
   categoryId     Int?
