@@ -1,5 +1,5 @@
 <template>
-  <div class="min-h-screen bg-gray-50">
+  <div class="min-h-screen bg-white">
     <Header />
 
     <!-- Danh mục -->
@@ -119,11 +119,13 @@
         />
       </div>
     </div>
+    <Footer />
   </div>
 </template>
 
 <script setup>
 import Header from '~/components/User/Header.vue'
+import Footer from '~/components/User/Footer.vue'
 import CategoryMenu from '~/components/User/CategoryMenu.vue'
 import ProductCard from '~/components/User/ProductCard.vue'
 import { useAuctions } from '~/composables/User/useAuctions'
