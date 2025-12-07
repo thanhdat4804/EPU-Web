@@ -15,6 +15,7 @@ import { ServeStaticModule } from '@nestjs/serve-static'
 import { join } from 'path'
 import { FavoriteModule } from './modules/favorite/favorite.module'
 import { EventEmitterModule } from '@nestjs/event-emitter';
+import { UserAddressModule } from './user-address/user-address.module'
 @Module({
   imports: [
     // 1. Schedule
@@ -31,6 +32,7 @@ import { EventEmitterModule } from '@nestjs/event-emitter';
     ItemModule,
     FavoriteModule,
     NotificationModule,
+    UserAddressModule,
     // 3. CÁCH 2: PHỤC VỤ ẢNH TỪ THƯ MỤC uploads/
     ServeStaticModule.forRoot({
       rootPath: join(__dirname, '..', 'uploads'), // Đường dẫn tuyệt đối đến thư mục uploads/

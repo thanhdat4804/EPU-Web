@@ -7,35 +7,6 @@ import { Roles } from '../auth/roles.decorator';
 @Controller('users')
 export class UserController {
   constructor(private readonly userService: UserService) {}
-
-  // Thêm địa chỉ
-  @UseGuards(JwtAuthGuard)
-  @Post('address')
-  async saveDelivery(@Req() req, @Body() body: { country: string; address: string }) {
-    return this.userService.addAddress(req.user.id, body)
-  }
-
-  // Xóa địa chỉ giao hàng
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('User')
-  @Delete('address')
-  async deleteDelivery(@Req() req) {
-    return this.userService.deleteAddress(req.user.id)
-  }
-
-  // Lấy địa chỉ giao hàng
-  @Get('address')
-  @UseGuards(JwtAuthGuard)
-  async getAddress(@Req() req) {
-    return this.userService.getAddress(req.user.id)
-  }
-
-  // Câp nhật địa chỉ giao hàng
-  @Patch('address')
-  @UseGuards(JwtAuthGuard)
-  async updateAddress(@Req() req, @Body() body: { country?: string; address?: string }) {
-    return this.userService.updateAddress(req.user.id, body)
-  }
   
   // 🟢 Chỉ admin được phép xem danh sách
   @Get()
