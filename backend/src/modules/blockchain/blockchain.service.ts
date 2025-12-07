@@ -471,6 +471,7 @@ export class BlockchainService {
         item: {
           include: {
             category: { select: { id: true, name: true } },
+            owner: true,
           },
         },
         seller: { select: { id: true, name: true, wallet: true } },
@@ -691,5 +692,81 @@ export class BlockchainService {
     }
 
     return { success: true, message: 'Đã xác nhận giao hàng! Chờ người mua nhận hàng.' };
+  }
+
+  // TÍNH TỔNG DOANH THU CỦA MỘT SELLER
+  async getSellerRevenue(sellerId: number) {
+    const result = await this.prisma.auctionWinner.findMany({
+      where: {
+        auction: {
+          sellerId: sellerId,
+          status: 'Paid', // CHỈ LẤY NHỮNG PHIÊN ĐÃ THANH TOÁN
+        },
+      },
+      select: {
+        bidAmount: true, // số tiền người thắng đã trả
+      },
+    })
+
+    // Cộng tổng tất cả bidAmount
+    const totalRevenue = result.reduce((sum, winner) => {
+      return sum + Number(winner.bidAmount)
+    }, 0)
+
+    return {
+      sellerId,
+      totalAuctionsWon: result.length,
+      totalRevenue: totalRevenue.toFixed(4), // trả về dạng string 4 chữ số thập phân
+      currency: 'ETH',
+    }
+  }
+
+  // TOP 10 SELLER DOANH THU CAO NHẤT (nếu muốn hiển thị bảng xếp hạng)
+  async getTopSellers(limit = 10) {
+    const winners = await this.prisma.auctionWinner.findMany({
+      where: {
+        auction: {
+          status: 'Paid',
+        },
+      },
+      select: {
+        bidAmount: true,
+        auction: {
+          select: {
+            seller: {
+              select: {
+                id: true,
+                name: true,
+                wallet: true,
+              },
+            },
+          },
+        },
+      },
+    })
+
+    // Gom nhóm theo seller
+    const revenueMap = new Map<number, { seller: any; revenue: number; count: number }>()
+
+    for (const winner of winners) {
+      const seller = winner.auction.seller
+      const current = revenueMap.get(seller.id) || { seller, revenue: 0, count: 0 }
+      current.revenue += Number(winner.bidAmount)
+      current.count += 1
+      revenueMap.set(seller.id, current)
+    }
+
+    // Chuyển sang mảng + sort
+    const topSellers = Array.from(revenueMap.values())
+      .sort((a, b) => b.revenue - a.revenue)
+      .slice(0, limit)
+
+    return topSellers.map(item => ({
+      sellerId: item.seller.id,
+      name: item.seller.name,
+      wallet: item.seller.wallet,
+      totalRevenue: item.revenue.toFixed(4),
+      auctionsSold: item.count,
+    }))
   }
 }

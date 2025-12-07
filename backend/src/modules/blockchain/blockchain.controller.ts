@@ -7,6 +7,7 @@ import {
   Req,
   UseGuards,
   Logger,
+  Query,
 } from '@nestjs/common';
 import { BlockchainService } from './blockchain.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -121,5 +122,16 @@ export class BlockchainController {
     @Body('txHash') txHash: string,
   ) {
     return this.blockchainService.confirmShippedBySeller(req.user.id, address, txHash);
+  }
+
+  @Get('seller/:id/revenue')
+  @UseGuards(JwtAuthGuard)
+  async getSellerRevenue(@Param('id') sellerId: string) {
+    return this.blockchainService.getSellerRevenue(+sellerId)
+  }
+
+  @Get('top-sellers')
+  async getTopSellers(@Query('limit') limit?: string) {
+    return this.blockchainService.getTopSellers(limit ? +limit : 10)
   }
 }
