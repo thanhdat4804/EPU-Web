@@ -89,7 +89,42 @@
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
           </svg>
         </button>
-        
+        <div
+          :class="[
+            'overflow-hidden transition-all duration-300',
+            openGroups.users ? 'max-h-60 mt-1' : 'max-h-0'
+          ]"
+        >
+          <div class="ml-8 space-y-1">
+           
+            <NuxtLink
+              to="/admin/users"
+              :class="getSubItemClass('/admin/experts')"
+            >
+              Người dùng
+            </NuxtLink>
+
+           
+          </div>
+        </div>
+        <div
+          :class="[
+            'overflow-hidden transition-all duration-300',
+            openGroups.users ? 'max-h-60 mt-1' : 'max-h-0'
+          ]"
+        >
+          <div class="ml-8 space-y-1">
+           
+            <NuxtLink
+              to="/admin/sellers"
+              :class="getSubItemClass('/admin/experts')"
+            >
+              Người bán
+            </NuxtLink>
+
+           
+          </div>
+        </div>
         <div
           :class="[
             'overflow-hidden transition-all duration-300',
