@@ -32,4 +32,8 @@ export class CreateItemDto {
   @IsOptional()
   @IsNumber()
   categoryId?: number
+
+  @IsNumber()
+  @Min(1)
+  duration: number; 
 }

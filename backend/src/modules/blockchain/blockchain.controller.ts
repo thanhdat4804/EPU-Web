@@ -1,9 +1,19 @@
-import { Controller, Post, Get, Body, Param, Req, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Get,
+  Body,
+  Param,
+  Req,
+  UseGuards,
+  Logger,
+  Query,
+} from '@nestjs/common';
 import { BlockchainService } from './blockchain.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-
 @Controller('auction')
 export class BlockchainController {
+  private readonly logger = new Logger(BlockchainController.name);
   constructor(private readonly blockchainService: BlockchainService) {}
 
   // 🟢 Lấy danh sách đấu giá
@@ -12,73 +22,116 @@ export class BlockchainController {
     return this.blockchainService.getAllAuctions();
   }
 
-  // 🟢 Chi tiết 1 đấu giá
+  // 🟢 Chi tiết 1 đấu giá (on-chain + DB)
   @Get(':address/detail')
   async getAuctionDetail(@Param('address') address: string) {
     return this.blockchainService.getAuctionDetail(address);
   }
 
-  // 🟢 Tạo đấu giá
+  @Post('create-from-item')
   @UseGuards(JwtAuthGuard)
-  @Post('create')
-  async createAuction(@Body() data: any, @Req() req: any) {
-    return this.blockchainService.createAuction(data, req.user.id);
+  async createFromItem(
+    @Req() req: Request & { user: { id: number } },
+    @Body() body: { itemId: number; contractAddress: string; txHash: string }
+  ) {
+    return this.blockchainService.createAuctionFromApprovedItem(req.user.id, body)
   }
 
-  // 🟢 Đặt giá — chỉ cần gửi amount, backend tự tính deposit = 10%
+  // 🟢 Ghi nhận giao dịch đặt giá (MetaMask đã thực hiện on-chain)
   @UseGuards(JwtAuthGuard)
-  @Post(':address/bid')
-  async placeBid(
+  @Post(':address/record-bid')
+  async recordBid(
     @Param('address') address: string,
-    @Body('amount') amount: number,
+    @Body() body: { amount: number; txHash: string },
     @Req() req: any,
   ) {
-    return this.blockchainService.placeBid(address, amount, req.user.id);
+    const { amount, txHash } = body;
+    if (!amount || !txHash) {
+      throw new Error('Thiếu amount hoặc txHash!');
+    }
+    return this.blockchainService.recordBid(req.user.id, address, amount, txHash);
   }
 
-  @Post(':address/pay')
+  // 🟢 Ghi nhận giao dịch thanh toán (MetaMask đã thực hiện on-chain)
   @UseGuards(JwtAuthGuard)
-  async payWinningBid(@Param('address') address: string, @Req() req: any) {
-    return this.blockchainService.payWinningBid(address, req.user.id);
+  @Post(':address/record-payment')
+  async recordPayment(
+    @Param('address') address: string,
+    @Body() body: { txHash: string },
+    @Req() req: any,
+  ) {
+    const { txHash } = body;
+    if (!txHash) {
+      throw new Error('Thiếu txHash!');
+    }
+    return this.blockchainService.recordPayment(req.user.id, address, txHash);
   }
 
-  // 🟢 Buyer xác nhận nhận hàng
-  @UseGuards(JwtAuthGuard)
-  @Post(':address/confirm')
-  async confirmReceived(@Param('address') address: string, @Req() req: any) {
-    return this.blockchainService.confirmReceived(address, req.user.id);
-  }
-
-  // 🟢 Mở tranh chấp
-  @UseGuards(JwtAuthGuard)
-  @Post(':address/dispute')
-  async openDispute(@Param('address') address: string, @Req() req: any) {
-    return this.blockchainService.openDispute(address, req.user.id);
-  }
-
-  // 🟢 Seller hoàn tiền cho buyer
-  @UseGuards(JwtAuthGuard)
-  @Post(':address/refund')
-  async refundBuyer(@Param('address') address: string, @Req() req: any) {
-    return this.blockchainService.refundBuyer(address, req.user.id);
-  }
-
-  // 🟢 Phạt người thắng không thanh toán
+  // 🟢 Phạt người thắng không thanh toán (admin cron hoặc manual)
   @Post(':address/penalize')
   async penalizeWinner(@Param('address') address: string) {
     return this.blockchainService.penalizeWinner(address);
   }
 
-  // 🟢 Người thua rút lại cọc
-  @UseGuards(JwtAuthGuard)
-  @Post(':address/withdraw')
-  async withdrawDeposit(@Param('address') address: string, @Req() req: any) {
-    return this.blockchainService.withdrawDeposit(address, req.user.id);
-  }
-
-  // 🟢 Lấy danh sách đặt giá
+  // 🟢 Lấy danh sách đặt giá (on-chain)
   @Get(':address/bids')
   async getAllBids(@Param('address') address: string) {
-    return this.blockchainService.getAllBids(address);
+    try {
+      if (!/^0x[a-fA-F0-9]{40}$/.test(address)) {
+        return []; // Trả mảng rỗng nếu address sai
+      }
+      const bids = await this.blockchainService.getAllBids(address);
+      return bids; // Luôn trả mảng (có thể rỗng)
+    } catch (error: any) {
+      this.logger.warn(`getAllBids(${address}) failed: ${error.message}`);
+      return []; // QUAN TRỌNG: TRẢ [] THAY VÌ 500
+    }
+  }
+  
+  // 🟢 Lấy danh sách đấu giá của user (DB)
+  @UseGuards(JwtAuthGuard)
+  @Get('my')
+  async getMyAuctions(@Req() req: any) {
+    return this.blockchainService.getMyAuctions(req.user.userId);
+  }
+  
+  // 🟢 Lấy danh sách đấu giá thắng của user (DB)
+  @UseGuards(JwtAuthGuard)
+  @Get('my-wins')
+  async getMyWinningAuctions(@Req() req: any) {
+    return this.blockchainService.getWinningAuctions(req.user.id);
+  }
+
+  // 🟢 Xác nhận đã nhận hàng (sau khi người thắng đã thanh toán)
+  @UseGuards(JwtAuthGuard)
+  @Post(':address/confirm')
+  async confirmReceived(
+    @Param('address') address: string,
+    @Body('txHash') txHash: string,
+    @Req() req: any,
+  ) {
+    return this.blockchainService.confirmReceived(req.user.id, address, txHash);
+  }
+  
+  // 🟢 Xác nhận đã giao hàng (sau khi người thắng đã thanh toán)
+  @Post(':address/confirm-shipped')
+  @UseGuards(JwtAuthGuard)
+  async confirmShipped(
+    @Req() req: any,
+    @Param('address') address: string,
+    @Body('txHash') txHash: string,
+  ) {
+    return this.blockchainService.confirmShippedBySeller(req.user.id, address, txHash);
+  }
+
+  @Get('seller/:id/revenue')
+  @UseGuards(JwtAuthGuard)
+  async getSellerRevenue(@Param('id') sellerId: string) {
+    return this.blockchainService.getSellerRevenue(+sellerId)
+  }
+
+  @Get('top-sellers')
+  async getTopSellers(@Query('limit') limit?: string) {
+    return this.blockchainService.getTopSellers(limit ? +limit : 10)
   }
 }

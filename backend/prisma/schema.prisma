@@ -8,17 +8,54 @@ datasource db {
 }
 
 model User {
-  id                   Int       @id @default(autoincrement())
-  name                 String
-  email                String    @unique
-  password             String
-  wallet               String?   @unique
-  privatekey  String?   // 🔒 lưu private key đã mã hóa
-  role                 String    @default("User") // User | Admin | Seller
-  items                Item[]
-  auctions             Auction[] @relation("SellerAuctions")
-  bids                 Bid[]
-  createdAt            DateTime  @default(now())
+  id            Int      @id @default(autoincrement())
+  name          String
+  email         String   @unique
+  country       String?
+  password      String
+  wallet        String?  @unique
+  privatekey    String?
+  role          String   @default("User")
+  
+  // Quan hệ
+  addresses     UserAddress[]       // ← NHIỀU ĐỊA CHỈ
+  defaultAddress UserAddress? @relation("DefaultAddress", fields: [defaultAddressId], references: [id]) 
+  defaultAddressId Int?  @unique       // ← Lưu ID của địa chỉ mặc định
+
+  items         Item[]
+  auctions      Auction[] @relation("SellerAuctions")
+  bids          Bid[]
+  wonAuctions   AuctionWinner[] @relation("UserWonAuctions")
+  transactions  Transaction[]
+  favorites     FavoriteAuction[]
+  notification  Notification[]
+  createdAt     DateTime @default(now())
+  resetToken    String?
+  resetTokenExpire DateTime?
+}
+
+model UserAddress {
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  recipientName String   // Tên người nhận
+  phone         String
+  addressLine   String   // Số nhà, đường
+  ward          String?
+  district      String
+  city          String
+  country       String   @default("Việt Nam")
+  isDefault     Boolean  @default(false)
+
+  // Quan hệ ngược lại với User (địa chỉ mặc định)
+  defaultFor    User?    @relation("DefaultAddress")
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([userId])
+  @@index([isDefault])
 }
 
 model Category {
@@ -43,6 +80,10 @@ model Item {
   estimateMin    Float?
   estimateMax    Float?
 
+  // Image
+  mainImage      String?             // ảnh chính
+  subImages      String[] @default([]) // ảnh phụ (array)
+
   // 👤 Chủ sở hữu
   owner          User      @relation(fields: [ownerId], references: [id])
   ownerId        Int
@@ -51,7 +92,8 @@ model Item {
   auction        Auction?
 
   status         String    @default("pending") // pending | approved | rejected
-
+  
+  rejectReason  String?
   // 🔹 Thể loại
   category       Category? @relation(fields: [categoryId], references: [id])
   categoryId     Int?
@@ -59,6 +101,8 @@ model Item {
   reviewResult   ReviewResult?
 
   createdAt      DateTime  @default(now())
+
+  duration       Int?
 }
 
 model ReviewResult {
@@ -75,35 +119,81 @@ model ReviewResult {
 model Auction {
   id              Int       @id @default(autoincrement())
   item            Item      @relation(fields: [itemId], references: [id])
-  itemId          Int       @unique  // ✅ mỗi item chỉ có 1 auction
+  itemId          Int       @unique
   seller          User      @relation("SellerAuctions", fields: [sellerId], references: [id])
   sellerId        Int
   contractAddress String    @unique
   startTime       DateTime
   endTime         DateTime
-  status          String    @default("Active") // Active | Ended | Cancelled
+  status          String    @default("Active")
   bids            Bid[]
   transactions    Transaction[]
+  winner          AuctionWinner? @relation("AuctionHasWinner") // ✅ đặt tên rõ ràng
   createdAt       DateTime  @default(now())
+  buyerPaidAt     DateTime?
+  favoritedBy     FavoriteAuction[]
+}
+
+model AuctionWinner {
+  id           Int      @id @default(autoincrement())
+  auction      Auction  @relation("AuctionHasWinner", fields: [auctionId], references: [id]) // ✅ đối xứng với Auction
+  auctionId    Int      @unique
+  bidder       User     @relation("UserWonAuctions", fields: [bidderId], references: [id])  // ✅ đối xứng với User
+  bidderId     Int
+  bidAmount    Decimal
+  txHash       String?
+  finalizedAt  DateTime @default(now())
 }
 
 model Bid {
   id         Int       @id @default(autoincrement())
   bidder     User      @relation(fields: [bidderId], references: [id])
   bidderId   Int
+  txHash     String?
   auction    Auction   @relation(fields: [auctionId], references: [id])
   auctionId  Int
   amount     Float
   createdAt  DateTime  @default(now())
+  status String? // "win" | "lose"
 }
 
 model Transaction {
-  id          Int       @id @default(autoincrement())
-  txHash      String    @unique
-  fromAddress String
-  toAddress   String
-  amount      Float
-  auction     Auction?  @relation(fields: [auctionId], references: [id])
-  auctionId   Int?
-  createdAt   DateTime  @default(now())
+  id           Int       @id @default(autoincrement())
+  txHash       String?   @unique
+  fromAddress  String?   // ✅ có thể null vì khi recordPayment từ MetaMask bạn không cần truyền
+  toAddress    String?   // ✅ tương tự
+  amount       Float?    // ✅ có thể không truyền khi là payment record
+  auctionId    Int?
+  auction      Auction?  @relation(fields: [auctionId], references: [id])
+  type         String    // “bid”, “payment”, ...
+  userId       Int?      // ✅ để tránh lỗi khi user chưa có (vd admin action)
+  user         User?     @relation(fields: [userId], references: [id])
+  createdAt    DateTime  @default(now())
+}
+
+model FavoriteAuction {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  auctionId Int
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id])
+  auction   Auction  @relation(fields: [auctionId], references: [id])
+
+  @@unique([userId, auctionId]) // tránh thêm 2 lần
+}
+
+model Notification {
+  id         Int      @id @default(autoincrement())
+  userId     Int
+  type       String
+  title      String
+  message    String
+  image      String?     // optional image
+  targetType String      // "auction", "payment", etc.
+  targetId   Int
+  isRead     Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  link       String
+  user User @relation(fields: [userId], references: [id])
 }

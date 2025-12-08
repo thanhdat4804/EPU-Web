@@ -142,13 +142,11 @@ const placeBid = async () => {
 
 onMounted(fetchItem)
 
-const formatPrice = (price) =>
-  price
-    ? new Intl.NumberFormat('vi-VN', {
-        style: 'currency',
-        currency: 'VND'
-      }).format(price)
-    : '—'
+const formatPrice = (price) => {
+  if (!price) return '—'
+  return `${Number(price).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ETH`
+}
+
 
 const formatEstimate = (min, max) => {
   if (!min && !max) return '—'
