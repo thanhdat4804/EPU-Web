@@ -49,7 +49,7 @@ export class UserService {
       where: {
         auction: {
           sellerId: { in: sellerIds },
-          status: 'Paid',
+          status: 'Completed',
         },
       },
       select: {
@@ -188,7 +188,7 @@ export class UserService {
       where: {
         auction: {
           sellerId: id,
-          status: 'Paid',
+          status: 'Completed',
         },
       },
       _sum: { bidAmount: true },
