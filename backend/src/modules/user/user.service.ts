@@ -18,7 +18,7 @@ export class UserService {
 
   // 🟢 Lấy danh sách người dùng (ẩn thông tin nhạy cảm)
   async getAllUsers() {
-    return this.prisma.user.findMany({
+    const users = await this.prisma.user.findMany({
       select: {
         id: true,
         name: true,
@@ -29,6 +29,86 @@ export class UserService {
       },
       orderBy: { createdAt: 'desc' },
     });
+
+    const sellerIds = users.map(u => u.id)
+    if (sellerIds.length === 0) {
+      return users.map(u => ({ ...u, sellerStats: null }))
+    }
+
+    // 1. THỐNG KÊ AUCTION THEO STATUS
+    const auctionStats = await this.prisma.auction.groupBy({
+      by: ['sellerId', 'status'],
+      where: { sellerId: { in: sellerIds } },
+      _count: { _all: true },
+    })
+
+    // 2. DOANH THU + SỐ PHIÊN BÁN THÀNH CÔNG (Paid)
+    // Prisma không cho groupBy qua relation → dùng raw query hoặc cách khác
+    // → DÙNG CÁCH AN TOÀN NHẤT: LẤY TẤT CẢ WINNER RỒI GOM NHÓM BẰNG JS
+    const winners = await this.prisma.auctionWinner.findMany({
+      where: {
+        auction: {
+          sellerId: { in: sellerIds },
+          status: 'Paid',
+        },
+      },
+      select: {
+        bidAmount: true,
+        auction: {
+          select: { sellerId: true }
+        }
+      }
+    })
+
+    // Gom nhóm doanh thu bằng JS (siêu nhanh, siêu chuẩn)
+    const revenueMap = new Map<number, { revenue: number; sold: number }>()
+
+    for (const w of winners) {
+      const sellerId = w.auction.sellerId
+      const current = revenueMap.get(sellerId) || { revenue: 0, sold: 0 }
+      current.revenue += Number(w.bidAmount || 0)
+      current.sold += 1
+      revenueMap.set(sellerId, current)
+    }
+
+    // 3. TẠO MAP THỐNG KÊ CHO TỪNG SELLER
+    const statsMap = new Map<number, any>()
+
+    for (const userId of sellerIds) {
+      statsMap.set(userId, {
+        totalAuctions: 0,
+        activeAuctions: 0,
+        endedAuctions: 0,
+        totalRevenue: '0.0000',
+        auctionsSold: 0,
+        currency: 'ETH',
+      })
+    }
+
+    // Điền số lượng auction
+    for (const stat of auctionStats) {
+      const s = statsMap.get(stat.sellerId)!
+      s.totalAuctions += stat._count._all
+
+      if (stat.status === 'Active') {
+        s.activeAuctions += stat._count._all
+      } else if (['Completed', 'Penalized', 'PenalizedSeller'].includes(stat.status)) {
+        s.endedAuctions += stat._count._all
+      }
+    }
+
+    // Điền doanh thu từ revenueMap
+    for (const [sellerId, data] of revenueMap) {
+      const s = statsMap.get(sellerId)!
+      s.totalRevenue = data.revenue.toFixed(4)
+      s.auctionsSold = data.sold
+    }
+
+    // Gắn vào user
+    return users.map(user => ({
+      ...user,
+      sellerStats: statsMap.get(user.id) || null,
+    }))
   }
 
   // 🟢 Lấy thông tin chi tiết 1 user
@@ -43,7 +123,6 @@ export class UserService {
         role: true,
         createdAt: true,
 
-        // 🟢 Vật phẩm mà user sở hữu (người bán)
         items: {
           select: {
             id: true,
@@ -53,37 +132,35 @@ export class UserService {
           },
         },
 
-        // 🟢 Các cuộc đấu giá do user tạo (người bán)
         auctions: {
           select: {
             id: true,
             contractAddress: true,
             status: true,
             createdAt: true,
-            item: {   // Thêm item liên kết với auction
+            item: {
               select: {
                 id: true,
                 name: true,
-                imageUrl: true,
+                mainImage: true,
                 startingPrice: true,
               },
             },
           },
         },
 
-        // 🟢 Các phiên đấu giá user đã tham gia (người mua)
         bids: {
           select: {
             id: true,
             amount: true,
             status: true,
             createdAt: true,
-            auction: { // Nối sang bảng auction
+            auction: {
               select: {
                 id: true,
                 contractAddress: true,
                 status: true,
-                item: { // Và nối tiếp sang bảng item
+                item: {
                   select: {
                     id: true,
                     name: true,
@@ -99,7 +176,51 @@ export class UserService {
 
     if (!user) throw new NotFoundException('Không tìm thấy người dùng');
 
-    return user;
+    // THỐNG KÊ BÁN HÀNG – SIÊU CHUẨN THEO Ý HOÀNG ĐẾ
+    const auctionStats = await this.prisma.auction.groupBy({
+      by: ['status'],
+      where: { sellerId: id },
+      _count: { id: true },
+    });
+
+    // Doanh thu + số phiên bán thành công (chỉ tính khi Paid)
+    const winnerStats = await this.prisma.auctionWinner.aggregate({
+      where: {
+        auction: {
+          sellerId: id,
+          status: 'Paid',
+        },
+      },
+      _sum: { bidAmount: true },
+      _count: { id: true },
+    });
+
+    // Tính số lượng theo từng trạng thái
+    const getCount = (status: string) =>
+      auctionStats.find(s => s.status === status)?._count.id || 0
+
+    const stats = {
+      totalAuctions: auctionStats.reduce((sum, s) => sum + s._count.id, 0),
+      activeAuctions: getCount('Active'),
+      
+      // ĐÃ KẾT THÚC = Completed + Penalized + PenalizedSeller
+      endedAuctions: 
+        getCount('Completed') + 
+        getCount('Penalized') + 
+        getCount('PenalizedSeller'),
+
+      // Doanh thu + số phiên bán thành công
+      totalRevenue: winnerStats._sum.bidAmount
+        ? Number(winnerStats._sum.bidAmount).toFixed(4)
+        : '0.0000',
+      auctionsSold: winnerStats._count.id || 0,
+      currency: 'ETH',
+    }
+
+    return {
+      ...user,
+      sellerStats: stats,
+    }
   }
 
 

@@ -198,6 +198,33 @@ export function useAuctionApi() {
       body: { txHash },
     })
   }
+  // 1. LẤY DOANH THU CỦA CHÍNH MÌNH (SELLER)
+  const getMyRevenue = async () => {
+    try {
+      const res = await $fetch('/auctions/seller/me/revenue', {
+        headers: getHeaders(),
+        credentials: 'include'
+      })
+      return res // → { totalRevenue: "42.5000", totalAuctionsWon: 12, currency: "ETH" }
+    } catch (err: any) {
+      console.error('Lỗi lấy doanh thu:', err)
+      throw new Error(err.data?.message || 'Không thể lấy doanh thu')
+    }
+  }
+
+  // 2. LẤY TOP 10 SELLER DOANH THU CAO NHẤT (BẢNG XẾP HẠNG)
+  const getTopSellers = async (limit = 10) => {
+    try {
+      const res = await $fetch(`/auctions/top-sellers?limit=${limit}`, {
+        headers: getHeaders(),
+        credentials: 'include'
+      })
+      return res // → mảng các seller: { sellerId, name, wallet, totalRevenue, auctionsSold }
+    } catch (err: any) {
+      console.error('Lỗi lấy top sellers:', err)
+      throw new Error(err.data?.message || 'Không thể lấy bảng xếp hạng')
+    }
+  }
   return {
     getAuctions,
     getAuctionDetail,
@@ -213,5 +240,7 @@ export function useAuctionApi() {
     penalizeWinner,
     getMyAuctions,
     confirmShipped,
+    getMyRevenue,
+    getTopSellers,
   }
 }

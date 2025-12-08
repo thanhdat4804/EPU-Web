@@ -700,7 +700,7 @@ export class BlockchainService {
       where: {
         auction: {
           sellerId: sellerId,
-          status: 'Paid', // CHỈ LẤY NHỮNG PHIÊN ĐÃ THANH TOÁN
+          status: 'Completed', // CHỈ LẤY NHỮNG PHIÊN ĐÃ THANH TOÁN
         },
       },
       select: {
@@ -726,7 +726,7 @@ export class BlockchainService {
     const winners = await this.prisma.auctionWinner.findMany({
       where: {
         auction: {
-          status: 'Paid',
+          status: 'Completed',
         },
       },
       select: {

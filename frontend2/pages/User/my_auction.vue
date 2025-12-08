@@ -164,54 +164,89 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ethers } from 'ethers'
+
 import Header from '~/components/User/Header.vue'
 import { useItem } from '~/composables/useItem'
 import { useAuctionApi } from '~/composables/useAuctionApi'
 
+// ==================== ROUTER & COMPOSABLES ====================
 const router = useRouter()
 const { getMyItems } = useItem()
 const { getMyAuctions, createAuctionFromItem, confirmShipped, confirmReceived } = useAuctionApi()
 
+// ==================== STATE ====================
 const activeTab = ref('all')
 const items = ref<any[]>([])
 const auctions = ref<any[]>([])
 const isActing = ref(false)
 const currentUserAddress = ref<string>('')
 
-// HÀM MỚI – SỬA ẢNH HIỂN THỊ ĐÚNG ĐƯỜNG DẪN /uploads/
-const getImageUrl = (item: any) => {
-  const image = item.mainImage || item.item?.mainImage
-  if (!image) return '/no-image.jpg'
-  return `http://localhost:3001/uploads/${image}`
-}
-
+// ==================== TABS ====================
 const tabs = [
-  { key: 'all', label: 'Tất cả', count: 0 },
-  { key: 'pending', label: 'Chờ duyệt', count: 0 },
-  { key: 'approved', label: 'Đã duyệt (chờ thanh toán)', count: 0 },
-  { key: 'Active', label: 'Đang diễn ra', count: 0 },
-  { key: 'Ended', label: 'Đã kết thúc', count: 0 },
-  { key: 'Paid', label: 'Đã thanh toán', count: 0 },
-  { key: 'Shipped', label: 'Đã giao hàng', count: 0 },
-  { key: 'Completed', label: 'Hoàn tất', count: 0 },
-  { key: 'Penalized', label: 'Bị phạt', count: 0 },
-  { key: 'PenalizedSeller', label: 'Bị phạt (bạn)', count: 0 },
+  { key: 'all',           label: 'Tất cả',                     count: 0 },
+  { key: 'pending',       label: 'Chờ duyệt',                  count: 0 },
+  { key: 'approved',      label: 'Đã duyệt (chờ thanh toán)',  count: 0 },
+  { key: 'Active',        label: 'Đang diễn ra',               count: 0 },
+  { key: 'Ended',         label: 'Đã kết thúc',                count: 0 },
+  { key: 'Paid',          label: 'Đã thanh toán',              count: 0 },
+  { key: 'Shipped',       label: 'Đã giao hàng',               count: 0 },
+  { key: 'Completed',     label: 'Hoàn tất',                   count: 0 },
+  { key: 'Penalized',     label: 'Bị phạt',                    count: 0 },
+  { key: 'PenalizedSeller', label: 'Bị phạt (bạn)',            count: 0 },
 ]
 
 const statusConfig: any = {
-  pending: { label: 'Chờ duyệt', badge: 'bg-yellow-500' },
-  approved: { label: 'Đã duyệt', badge: 'bg-blue-500' },
-  Active: { label: 'Đang đấu giá', badge: 'bg-emerald-500' },
-  Ended: { label: 'Đã kết thúc', badge: 'bg-gray-500' },
-  Paid: { label: 'Đã thanh toán', badge: 'bg-blue-600' },
-  Shipped: { label: 'Đã giao hàng', badge: 'bg-purple-600' },
-  Completed: { label: 'Hoàn tất', badge: 'bg-green-600' },
-  Penalized: { label: 'Buyer bị phạt', badge: 'bg-red-500' },
-  PenalizedSeller: { label: 'Bạn bị phạt', badge: 'bg-red-600' },
+  pending:         { label: 'Chờ duyệt',         badge: 'bg-yellow-500' },
+  approved:        { label: 'Đã duyệt',          badge: 'bg-blue-500' },
+  Active:          { label: 'Đang đấu giá',      badge: 'bg-emerald-500' },
+  Ended:           { label: 'Đã kết thúc',       badge: 'bg-gray-500' },
+  Paid:            { label: 'Đã thanh toán',     badge: 'bg-blue-600' },
+  Shipped:         { label: 'Đã giao hàng',     badge: 'bg-purple-600' },
+  Completed:       { label: 'Hoàn tất',          badge: 'bg-green-600' },
+  Penalized:       { label: 'Buyer bị phạt',     badge: 'bg-red-500' },
+  PenalizedSeller: { label: 'Bạn bị phạt',       badge: 'bg-red-600' },
 }
 
+// ==================== HELPER FUNCTIONS ====================
+// Hiển thị ảnh đúng đường dẫn /uploads/
+const getImageUrl = (item: any): string => {
+  const image = item.mainImage || item.item?.item?.mainImage
+  return image ? `http://localhost:3001/uploads/${image}` : '/no-image.jpg'
+}
+
+// Lấy wallet của seller từ mọi nguồn dữ liệu
+const getSellerWallet = (item: any): string | null => {
+  return (
+    item.seller?.wallet?.toLowerCase() ||
+    item.owner?.wallet?.toLowerCase() ||
+    item.item?.owner?.wallet?.toLowerCase() ||
+    null
+  )
+}
+
+// Lấy contract address đúng 100%
+const getContractAddress = (item: any): string | null => {
+  return (
+    item.auction?.contractAddress ||
+    item.contractAddress ||
+    item.item?.auction?.contractAddress ||
+    null
+  )
+}
+
+// Format
+const formatPrice = (v: any) => Number(v || 0).toFixed(4)
+const shortenAddress = (addr: string) => addr ? `${addr.slice(0, 6)}...${addr.slice(-4)}` : ''
+const formatDate = (d: string) => d ? new Date(d).toLocaleString('vi-VN', { dateStyle: 'short', timeStyle: 'short' }) : ''
+const viewDetail = (addr: string) => addr && router.push(`/auction/${addr}`)
+
+// ==================== LOAD DATA ====================
 onMounted(async () => {
-  await Promise.all([loadItems(), loadAuctions(), connectWallet()])
+  await Promise.all([
+    loadItems(),
+    loadAuctions(),
+    connectWallet()
+  ])
 })
 
 const loadItems = async () => {
@@ -220,7 +255,7 @@ const loadItems = async () => {
     items.value = data || []
     updateTabCounts()
   } catch (err) {
-    console.error('Lỗi tải item:', err)
+    console.error('Lỗi tải items:', err)
   }
 }
 
@@ -230,7 +265,7 @@ const loadAuctions = async () => {
     auctions.value = data || []
     updateTabCounts()
   } catch (err) {
-    console.error('Lỗi tải auction:', err)
+    console.error('Lỗi tải auctions:', err)
   }
 }
 
@@ -246,6 +281,7 @@ const connectWallet = async () => {
   }
 }
 
+// ==================== TAB COUNTS ====================
 const updateTabCounts = () => {
   tabs.forEach(tab => {
     if (tab.key === 'all') {
@@ -260,6 +296,7 @@ const updateTabCounts = () => {
   })
 }
 
+// ==================== DISPLAYED ITEMS ====================
 const displayedItems = computed(() => {
   if (activeTab.value === 'all') return [...items.value, ...auctions.value]
   if (activeTab.value === 'pending') return items.value.filter(i => i.status === 'pending')
@@ -267,16 +304,12 @@ const displayedItems = computed(() => {
   return auctions.value.filter(a => a.status === activeTab.value)
 })
 
-const formatPrice = (v: any) => Number(v || 0).toFixed(4)
-const shortenAddress = (addr: string) => addr ? `${addr.slice(0, 6)}...${addr.slice(-4)}` : ''
-const formatDate = (d: string) => d ? new Date(d).toLocaleString('vi-VN', { dateStyle: 'short', timeStyle: 'short' }) : ''
-const viewDetail = (addr: string) => addr && router.push(`/auction/${addr}`)
-
 // ==================== THANH TOÁN & TẠO ĐẤU GIÁ ====================
 const handlePayment = async (item: any) => {
   if (!window.ethereum) return alert('Cài MetaMask!')
   if (isActing.value) return
   isActing.value = true
+
   try {
     const provider = new ethers.providers.Web3Provider(window.ethereum)
     await provider.send('eth_requestAccounts', [])
@@ -291,8 +324,7 @@ const handlePayment = async (item: any) => {
     const factory = new ethers.Contract(factoryAddress, factoryABI, signer)
     const startingPriceWei = ethers.utils.parseEther(item.startingPrice.toString())
     const depositWei = startingPriceWei.mul(20).div(100)
-
-    const biddingTime = item.duration * 60 // chuyển phút -> giây
+    const biddingTime = item.duration * 60
 
     const tx = await factory.createAction(
       biddingTime,
@@ -305,13 +337,14 @@ const handlePayment = async (item: any) => {
     const receipt = await tx.wait()
 
     const iface = new ethers.utils.Interface(factoryABI)
-    const event = receipt.logs.map(log => { try { return iface.parseLog(log) } catch { return null } }).find(e => e?.name === 'ActionCreated')
-    if (!event?.args?.actionAddress) throw new Error('Không lấy được địa chỉ hợp đồng!')
+    const event = receipt.logs
+      .map(log => { try { return iface.parseLog(log) } catch { return null } })
+      .find(e => e?.name === 'ActionCreated')
 
+    if (!event?.args?.actionAddress) throw new Error('Không lấy được địa chỉ hợp đồng!')
     const contractAddress = event.args.actionAddress
 
     await createAuctionFromItem(item.id, contractAddress, tx.hash)
-
     alert('Tạo đấu giá thành công!')
     await Promise.all([loadItems(), loadAuctions()])
     router.push(`/auction/${contractAddress}`)
@@ -322,37 +355,48 @@ const handlePayment = async (item: any) => {
   }
 }
 
-// ==================== XÁC NHẬN GIAO/NHẬN HÀNG ====================
+// ==================== XÁC NHẬN GIAO HÀNG / NHẬN HÀNG – ĐÃ SỬA HOÀN HẢO ====================
 const handleAction = async (item: any) => {
   if (isActing.value) return
   isActing.value = true
+
   try {
     const provider = new ethers.providers.Web3Provider(window.ethereum)
+    await provider.send('eth_requestAccounts', [])
     const signer = provider.getSigner()
+
+    const contractAddress = getContractAddress(item)
+    if (!contractAddress) throw new Error('Không tìm thấy địa chỉ hợp đồng!')
+
+    const status = item.auction?.status || item.status
+
     let tx
 
-    if (item.auction?.status === 'Paid') {
-      const contract = new ethers.Contract(item.auction.contractAddress, ['function confirmShipped() external'], signer)
+    if (status === 'Paid') {
+      const contract = new ethers.Contract(contractAddress, ['function confirmShipped() external'], signer)
       tx = await contract.confirmShipped({ gasLimit: 300000 })
       await tx.wait()
-      await confirmShipped(item.auction.contractAddress, tx.hash)
+      await confirmShipped(contractAddress, tx.hash)
       alert('ĐÃ GIAO HÀNG THÀNH CÔNG!')
-    } else if (item.auction?.status === 'Shipped') {
-      const contract = new ethers.Contract(item.auction.contractAddress, ['function confirmReceived() external'], signer)
+    }
+    else if (status === 'Shipped') {
+      const contract = new ethers.Contract(contractAddress, ['function confirmReceived() external'], signer)
       tx = await contract.confirmReceived({ gasLimit: 300000 })
       await tx.wait()
-      await confirmReceived(item.auction.contractAddress, tx.hash)
+      await confirmReceived(contractAddress, tx.hash)
       alert('ĐÃ XÁC NHẬN NHẬN HÀNG!')
     }
+
     await loadAuctions()
   } catch (err: any) {
+    console.error(err)
     alert(err.message || 'Thao tác thất bại')
   } finally {
     isActing.value = false
   }
 }
 
-// ==================== TRẠNG THÁI & NÚT ====================
+// ==================== TRẠNG THÁI & NÚT – HOÀN HẢO NHẤT ====================
 const getItemStatus = (item: any) => {
   if (item.status === 'pending') return 'pending'
   if (item.status === 'approved' && !item.auction) return 'approved'
@@ -361,39 +405,53 @@ const getItemStatus = (item: any) => {
 
 const canAct = computed(() => (item: any) => {
   if (!currentUserAddress.value) return false
-  const user = currentUserAddress.value
-  const isSeller = item.owner?.wallet?.toLowerCase() === user || item.seller?.wallet?.toLowerCase() === user
-  const isBuyer = item.auction?.onchain?.highestBidder?.toLowerCase() === user
-  return (item.auction?.status === 'Paid' && isSeller) || (item.auction?.status === 'Shipped' && isBuyer)
+
+  const sellerWallet = getSellerWallet(item)
+  const buyerWallet = (item.auction?.onchain?.highestBidder || item.onchain?.highestBidder)?.toLowerCase()
+  const status = item.auction?.status || item.status
+
+  const isSeller = sellerWallet === currentUserAddress.value
+  const isBuyer = buyerWallet === currentUserAddress.value
+
+  return (status === 'Paid' && isSeller) || (status === 'Shipped' && isBuyer)
 })
 
-const actionText = computed(() => (item: any) =>
-  item.auction?.status === 'Paid' ? 'Xác nhận giao hàng' : 'Xác nhận nhận hàng'
-)
+const actionText = computed(() => (item: any) => {
+  const status = item.auction?.status || item.status
+  return status === 'Paid' ? 'Xác nhận giao hàng' : 'Xác nhận nhận hàng'
+})
 
-const actionClass = computed(() => (item: any) =>
-  item.auction?.status === 'Paid'
+const actionClass = computed(() => (item: any) => {
+  const status = item.auction?.status || item.status
+  return status === 'Paid'
     ? 'bg-orange-500 hover:bg-orange-600 text-white font-bold shadow-lg'
     : 'bg-green-600 hover:bg-green-700 text-white font-bold shadow-lg'
-)
+})
 
 const statusMessage = computed(() => (item: any) => {
   if (!currentUserAddress.value) return 'Chưa kết nối ví'
-  if (item.status === 'pending') return 'Đang chờ duyệt'
-  if (item.status === 'approved' && !item.auction) return 'Chờ bạn thanh toán'
-  if (item.auction?.status === 'Paid') return 'Chờ bạn giao hàng'
-  if (item.auction?.status === 'Shipped') return 'Đã giao – Chờ buyer xác nhận'
-  if (item.auction?.status === 'Completed') return 'Hoàn tất'
+
+  const sellerWallet = getSellerWallet(item)
+  const status = item.auction?.status || item.status
+  const isSeller = sellerWallet === currentUserAddress.value
+
+  if (status === 'pending') return 'Đang chờ duyệt'
+  if (status === 'approved' && !item.auction) return 'Chờ bạn thanh toán'
+  if (status === 'Paid' && !isSeller) return 'Chờ bạn giao hàng'
+  if (status === 'Shipped' && isSeller) return 'Đã giao – Chờ buyer xác nhận'
+  if (status === 'Completed') return 'Hoàn tất'
+  if (status?.includes('Penalized')) return 'Bị phạt'
   return 'Không có hành động'
 })
 
 const statusBoxClass = computed(() => (item: any) => {
-  if (item.status === 'pending') return 'bg-yellow-100 text-yellow-700'
-  if (item.status === 'approved' && !item.auction) return 'bg-blue-100 text-blue-700'
-  if (item.auction?.status === 'Paid') return 'bg-blue-100 text-blue-700'
-  if (item.auction?.status === 'Shipped') return 'bg-purple-100 text-purple-700'
-  if (item.auction?.status === 'Completed') return 'bg-green-100 text-green-700'
-  if (item.auction?.status?.includes('Penalized')) return 'bg-red-100 text-red-700'
+  const status = item.auction?.status || item.status
+  if (status === 'pending') return 'bg-yellow-100 text-yellow-700'
+  if (status === 'approved' && !item.auction) return 'bg-blue-100 text-blue-700'
+  if (status === 'Paid') return 'bg-blue-100 text-blue-700'
+  if (status === 'Shipped') return 'bg-purple-100 text-purple-700'
+  if (status === 'Completed') return 'bg-green-100 text-green-700'
+  if (status?.includes('Penalized')) return 'bg-red-100 text-red-700'
   return 'bg-gray-100 text-gray-700'
 })
 </script>
