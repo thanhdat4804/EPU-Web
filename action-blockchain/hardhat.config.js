@@ -1,29 +1,20 @@
 require("@nomicfoundation/hardhat-toolbox");
-require("dotenv").config();
 
 module.exports = {
   solidity: "0.8.20",
-
+  
+  // CHỈ CẦN 2 DÒNG NÀY LÀ XONG
   defaultNetwork: "hardhat",
-
   networks: {
     hardhat: {
       chainId: 31337
+      // KHÔNG url, KHÔNG accounts → Hardhat tự chạy node local
     },
-
     localhost: {
-      url: "http://127.0.0.1:8545"
-    },
-
-    // ⭐ TESTNET (thêm vào đây để deploy)
-    sepolia: {
-      url: process.env.SEPOLIA_RPC,        // RPC từ Alchemy / Infura
-      accounts: [process.env.PRIVATE_KEY], // ví test
-      
-    },
-
+      url: "http://127.0.0.1:8545" // giữ lại để deploy sau
+    }
   },
-
+  
   paths: {
     artifacts: "../backend/src/artifacts",
   },
