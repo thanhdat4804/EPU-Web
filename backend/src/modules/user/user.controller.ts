@@ -66,5 +66,14 @@ export class UserController {
     return this.userService.resetPassword(token, newPassword);
   }
 
+  @Patch(':id/block')
+  block(@Param('id') id: string) {
+    return this.userService.blockUser(Number(id));
+  }
+
+  @Patch(':id/unblock')
+  unblock(@Param('id') id: string) {
+    return this.userService.unblockUser(Number(id));
+  }
   
 }

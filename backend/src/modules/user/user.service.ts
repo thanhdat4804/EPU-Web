@@ -22,6 +22,7 @@ export class UserService {
       select: {
         id: true,
         name: true,
+        status: true,
         email: true,
         wallet: true,
         role: true,
@@ -120,9 +121,9 @@ export class UserService {
         name: true,
         email: true,
         wallet: true,
+        status: true,
         role: true,
         createdAt: true,
-
         items: {
           select: {
             id: true,
@@ -364,5 +365,35 @@ export class UserService {
 
     return { message: 'Đặt lại mật khẩu thành công' };
   }
+  // 🟥 Block user
+  async blockUser(userId: number) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
 
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: { status: 'BLOCKED' },
+    });
+  }
+
+  // 🟩 Unblock user
+  async unblockUser(userId: number) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: { status: 'ACTIVE' },
+    });
+  }
 }

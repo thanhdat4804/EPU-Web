@@ -66,7 +66,7 @@ export class AuthService {
   }
 
   async login(dto: LoginDto) {
-    const { email, password } = dto
+    const { email, password } = dto;
 
     // 1. Tìm user theo email
     const user = await this.prisma.user.findUnique({
@@ -79,37 +79,44 @@ export class AuthService {
         role: true,
         wallet: true,
         createdAt: true,
+        status: true,   // ⭐ PHẢI THÊM
       },
-    })
+    });
 
     if (!user) {
-      throw new UnauthorizedException('Email hoặc mật khẩu không đúng')
+      throw new UnauthorizedException('Email hoặc mật khẩu không đúng');
     }
 
-    // 2. Kiểm tra mật khẩu
-    const isPasswordValid = await bcrypt.compare(password, user.password)
+    // ⭐ 2. CHẶN USER BỊ KHÓA
+    if (user.status === 'BLOCKED') {
+      throw new UnauthorizedException('Tài khoản của bạn đã bị khóa');
+    }
+
+    // 3. Kiểm tra mật khẩu
+    const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
-      throw new UnauthorizedException('Email hoặc mật khẩu không đúng')
+      throw new UnauthorizedException('Email hoặc mật khẩu không đúng');
     }
 
-    // 3. Tạo payload JWT
+    // 4. Tạo payload JWT
     const payload = {
       sub: user.id,
       email: user.email,
       role: user.role,
       wallet: user.wallet,
-    }
+    };
 
-    // 4. Tạo token
-    const token = await this.jwtService.signAsync(payload)
+    // 5. Tạo token
+    const token = await this.jwtService.signAsync(payload);
 
-    // 5. Trả về user (không có password)
-    const { password: _, ...userWithoutPassword } = user
+    // 6. Trả user (không password)
+    const { password: _, ...userWithoutPassword } = user;
 
     return {
       token,
       user: userWithoutPassword,
       message: 'Đăng nhập thành công!',
-    }
+    };
   }
+
 }
