@@ -286,10 +286,18 @@ export class BlockchainService {
   @Cron(CronExpression.EVERY_MINUTE)
   async autoPenalizeWinners() {
     if (!this.adminWallet) return;
-    const now = Math.floor(Date.now() / 1000);
-    const auctions = await this.prisma.auction.findMany({ where: { status: 'Ended' } });
 
-    for (const a of auctions) {
+    const now = Math.floor(Date.now() / 1000);
+
+    const auctionsToCheck = await this.prisma.auction.findMany({
+      where: { status: 'Ended' },
+      include: {
+        item: true,
+        winner: { include: { bidder: true } }
+      }
+    });
+
+    for (const a of auctionsToCheck) {
       try {
         const contract = new ethers.Contract(a.contractAddress, this.auctionABI, this.adminWallet);
         const [ended, isPaid, endTime] = await Promise.all([
@@ -298,40 +306,73 @@ export class BlockchainService {
           contract.actionEndTime().catch(() => ethers.BigNumber.from(0)),
         ]);
 
-        if (ended && !isPaid && now > Number(endTime) + 60) {
+        const endTimeNum = Number(endTime);
+        const timeSinceEnd = now - endTimeNum;
+
+        // NHẮC NHỞ SAU 30 GIÂY KẾT THÚC – NẾU CHƯA THANH TOÁN
+        if (ended && !isPaid && timeSinceEnd >= 30 && timeSinceEnd <= 50) {
+          if (a.winner?.bidderId) {
+            this.eventEmitter.emit('payment.required', {
+              userId: a.winner.bidderId,
+              auctionId: a.id,
+              title: a.item?.name || 'Đấu giá',
+              image: a.item?.mainImage ? `/uploads/${a.item.mainImage}` : null,
+              link: `/auction/${a.contractAddress}`,
+            });
+
+            this.logger.log(`GỬI NHẮC NHỞ THANH TOÁN SAU 30s CHO BUYER: ${a.contractAddress}`);
+          }
+        }
+
+        // PHẠT SAU 60 GIÂY – NẾU VẪN CHƯA THANH TOÁN
+        if (ended && !isPaid && timeSinceEnd > 60) {
           const tx = await contract.penalizeWinner();
           await tx.wait();
+
           await this.prisma.auction.update({
             where: { id: a.id },
             data: { status: 'Penalized' },
           });
-          this.logger.warn(`Winner penalized: ${a.contractAddress}`);
+
+          if (a.winner?.bidderId) {
+            this.eventEmitter.emit('auction.penalizedBuyer', {
+              buyerId: a.winner.bidderId,
+              auctionId: a.id,
+              title: a.item?.name || 'Auction',
+              image: a.item?.mainImage || null,
+            });
+          }
+
+          this.logger.warn(`Winner bị phạt sau 60s không thanh toán: ${a.contractAddress}`);
         }
       } catch (err: any) {
-        this.logger.error(`Penalize error: ${err.message}`);
+        this.logger.error(`Lỗi xử lý auction ${a.contractAddress}: ${err.message}`);
       }
     }
   }
-  @Cron(CronExpression.EVERY_MINUTE) // test nhanh
+
+  @Cron(CronExpression.EVERY_MINUTE)
   async autoPenalizeSeller() {
     if (!this.adminWallet) {
       this.logger.warn('ADMIN_PRIVATE_KEY not set');
       return;
     }
 
-    this.logger.log('Bắt đầu kiểm tra phạt seller (đọc 100% từ contract)');
+    this.logger.log('Bắt đầu kiểm tra phạt seller...');
 
-    const auctions = await this.prisma.auction.findMany({
+    // CHỈ DÙNG include → KHÔNG DÙNG select → KHÔNG LỖI!
+    const paidAuctions = await this.prisma.auction.findMany({
       where: { status: 'Paid' },
-      select: { id: true, contractAddress: true },
+      include: {
+        item: true,
+      }
     });
 
     let count = 0;
 
-    for (const a of auctions) {
+    for (const a of paidAuctions) {
       try {
         const contract = new ethers.Contract(a.contractAddress, this.auctionABI, this.adminWallet);
-
         const [buyerPaidAt, sellerShipped] = await Promise.all([
           contract.buyerPaidAt(),
           contract.sellerShipped(),
@@ -340,46 +381,33 @@ export class BlockchainService {
         const paidAt = Number(buyerPaidAt);
         const now = Math.floor(Date.now() / 1000);
 
-        // LOG ĐỂ BẠN THẤY RÕ MỌI THỨ
-        this.logger.log(`Contract ${a.contractAddress} | paidAt=${paidAt} | shipped=${sellerShipped} | now=${now}`);
+        if (paidAt === 0 || sellerShipped || now <= paidAt + 60) continue;
 
-        if (paidAt === 0) {
-          this.logger.log(`→ Chưa thanh toán hoặc contract cũ → bỏ qua`);
-          continue;
-        }
-        if (sellerShipped) {
-          this.logger.log(`→ Seller đã shipped → bỏ qua`);
-          continue;
-        }
-        if (now <= paidAt + 60) {
-          this.logger.log(`→ Chưa đủ 60 giây → còn ${(paidAt + 60 - now)} giây nữa`);
-          continue;
-        }
-        
-        // ĐẾN ĐÂY LÀ PHẢI PHẠT
-        this.logger.warn(`ĐỦ 60 GIÂY → ĐANG PHẠT SELLER: ${a.contractAddress}`);
-
+        this.logger.warn(`ĐANG PHẠT SELLER: ${a.contractAddress}`);
         const tx = await contract.penalizeSeller({ gasLimit: 500000 });
         await tx.wait();
-        
+
         await this.prisma.auction.update({
           where: { id: a.id },
           data: { status: 'PenalizedSeller' },
         });
-        
-        count++;
-        this.logger.warn(`PHẠT SELLER THÀNH CÔNG! Tx: ${tx.hash}`);
 
+        this.eventEmitter.emit('auction.penalizedSeller', {
+          sellerId: a.sellerId,
+          auctionId: a.id,
+          title: a.item?.name || 'Auction',
+          image: a.item?.mainImage || null,
+        });
+
+        count++;
+        this.logger.warn(`PHẠT SELLER THÀNH CÔNG + ĐÃ GỬI THÔNG BÁO! Tx: ${tx.hash}`);
       } catch (err: any) {
-        if (err.reason?.includes('Still in delivery window')) {
-          this.logger.log(`→ Chưa đủ thời gian (contract mới nhưng chưa tới hạn)`);
-          continue;
-        }
-        this.logger.error(`Lỗi contract ${a.contractAddress}: ${err.reason || err.message}`);
+        if (err.reason?.includes('Still in delivery window')) continue;
+        this.logger.error(`Lỗi phạt seller ${a.contractAddress}: ${err.reason || err.message}`);
       }
     }
 
-    this.logger.log(`Hoàn tất – Đã phạt: ${count} seller`);
+    this.logger.log(`Hoàn tất – Đã phạt ${count} seller + gửi thông báo`);
   }
 
   async penalizeWinner(address: string) {
@@ -533,34 +561,31 @@ export class BlockchainService {
 
     const auction = await this.prisma.auction.findUnique({
       where: { contractAddress: address },
-      include: { winner: { include: { bidder: true } } },
+      include: { 
+        winner: { include: { bidder: true } },
+        item: true,
+        seller: { select: { id: true } }
+      },
     });
 
     if (!auction) throw new NotFoundException('Không tìm thấy đấu giá');
     if (!auction.winner) throw new BadRequestException('Chưa có người thắng');
-    if (auction.winner.bidderId !== userId) throw new ForbiddenException('Bạn không phải người thắng');
+    if (auction.winner.bidderId !== userId) throw new ForbiddenException('Bạn không phải là người thắng');
 
     if (auction.status === 'Paid' || auction.status === 'Completed') {
       return { success: true, message: 'Đã thanh toán rồi!' };
     }
 
-    // KIỂM TRA TRÊN CHAIN: buyerPaid = true?
     const contract = new ethers.Contract(address, this.auctionABI, this.provider);
     const buyerPaid = await contract.buyerPaid();
+    if (!buyerPaid) throw new BadRequestException('Chưa thấy thanh toán trên chain. Vui lòng đợi 10-30s');
 
-    if (!buyerPaid) {
-      throw new BadRequestException('Chưa thấy thanh toán trên chain. Vui lòng đợi 10-30s');
-    }
-
-    // Cập nhật DB
+    // CẬP NHẬT DB
     await this.prisma.auction.update({
       where: { id: auction.id },
-      data: { status: 'Paid',
-        buyerPaidAt: new Date()
-       },
+      data: { status: 'Paid', buyerPaidAt: new Date() },
     });
 
-    // Ghi transaction
     await this.prisma.transaction.create({
       data: {
         txHash,
@@ -571,16 +596,80 @@ export class BlockchainService {
       },
     });
 
-    this.logger.log(`Thanh toán thành công: ${address}`);
+    // GỬI THÔNG BÁO CHO CẢ BUYER + SELLER
+    this.eventEmitter.emit('payment.completed', {
+      buyerId: userId,
+      sellerId: auction.sellerId,
+      auctionId: auction.id,
+      title: auction.item?.name || 'Đấu giá',
+      image: auction.item?.mainImage ? `/uploads/${auction.item.mainImage}` : null,
+    });
+
+    this.logger.log(`Thanh toán thành công + ĐÃ GỬI THÔNG BÁO CHO CẢ 2 BÊN: ${address}`);
     return { success: true, message: 'Thanh toán đã được ghi nhận!' };
   }
 
+  // Seller xác nhận giao hàng
+  async confirmShippedBySeller(userId: number, contractAddress: string, txHash: string) {
+    const auction = await this.prisma.auction.findUnique({
+      where: { contractAddress },
+      include: { 
+        seller: true,
+        winner: { include: { bidder: true } },
+        item: true,
+      },
+    });
+
+    if (!auction) throw new NotFoundException('Không tìm thấy đấu giá');
+    if (auction.sellerId !== userId) throw new ForbiddenException('Bạn không phải seller');
+    if (auction.status !== 'Paid') throw new BadRequestException('Chưa được thanh toán');
+
+    const contract = new ethers.Contract(contractAddress, this.auctionABI, this.provider);
+    const shipped = await contract.sellerShipped();
+    if (!shipped) throw new BadRequestException('Chưa thấy xác nhận giao hàng trên chain. Đợi 10-30s');
+
+    // CẬP NHẬT TRẠNG THÁI
+    await this.prisma.auction.update({
+      where: { id: auction.id },
+      data: { status: 'Shipped' },
+    });
+
+    const exist = await this.prisma.transaction.findUnique({ where: { txHash } });
+    if (!exist) {
+      await this.prisma.transaction.create({
+        data: {
+          txHash,
+          type: 'shipped',
+          amount: 0,
+          user: { connect: { id: userId } },
+          auction: { connect: { id: auction.id } },
+        },
+      });
+    }
+
+    // GỬI THÔNG BÁO CHO BUYER: "HÀNG ĐÃ GIAO"
+    this.eventEmitter.emit('auction.shipped', {
+      buyerId: auction.winner?.bidderId,
+      auctionId: auction.id,
+      title: auction.item?.name || 'Đấu giá',
+      image: auction.item?.mainImage ? `/uploads/${auction.item.mainImage}` : null,
+    });
+
+    this.logger.log(`Seller đã giao hàng + ĐÃ GỬI THÔNG BÁO CHO BUYER: ${contractAddress}`);
+    return { success: true, message: 'Đã xác nhận giao hàng! Chờ người mua nhận hàng.' };
+  }
+
+  // Buyer xác nhận nhận hàng
   async confirmReceived(userId: number, address: string, txHash: string) {
     this.logger.log('confirmReceived() STARTED', { userId, address, txHash });
 
     const auction = await this.prisma.auction.findUnique({
       where: { contractAddress: address },
-      include: { winner: { include: { bidder: true } } },
+      include: { 
+        winner: { include: { bidder: true } },
+        seller: { select: { id: true } },
+        item: true,
+      },
     });
 
     if (!auction || !auction.winner || auction.winner.bidderId !== userId) {
@@ -593,10 +682,7 @@ export class BlockchainService {
 
     const contract = new ethers.Contract(address, this.auctionABI, this.provider);
     const buyerConfirmed = await contract.buyerConfirmed();
-
-    if (!buyerConfirmed) {
-      throw new BadRequestException('Chưa xác nhận nhận hàng trên chain');
-    }
+    if (!buyerConfirmed) throw new BadRequestException('Chưa xác nhận nhận hàng trên chain');
 
     await this.prisma.auction.update({
       where: { id: auction.id },
@@ -613,6 +699,15 @@ export class BlockchainService {
       },
     });
 
+    // GỬI THÔNG BÁO CHO SELLER: "GIAO DỊCH HOÀN TẤT – TIỀN ĐÃ CHUYỂN"
+    this.eventEmitter.emit('auction.completed', {
+      sellerId: auction.sellerId,
+      auctionId: auction.id,
+      title: auction.item?.name || 'Đấu giá',
+      image: auction.item?.mainImage ? `/uploads/${auction.item.mainImage}` : null,
+    });
+
+    this.logger.log(`Buyer đã nhận hàng + ĐÃ GỬI THÔNG BÁO CHO SELLER: ${address}`);
     return { success: true, message: 'Xác nhận thành công! Tiền đã chuyển cho seller.' };
   }
 
@@ -653,46 +748,7 @@ export class BlockchainService {
     return true;
   }
 
-  // ============================================================
-  // Confirm shipped by seller
-  // ============================================================
-  async confirmShippedBySeller(userId: number, contractAddress: string, txHash: string) {
-    const auction = await this.prisma.auction.findUnique({
-      where: { contractAddress },
-      include: { seller: true },
-    });
-
-    if (!auction) throw new NotFoundException('Không tìm thấy đấu giá');
-    if (auction.sellerId !== userId) throw new ForbiddenException('Bạn không phải seller');
-    if (auction.status !== 'Paid') throw new BadRequestException('Chưa được thanh toán');
-
-    // Kiểm tra trên chain
-    const contract = new ethers.Contract(contractAddress, this.auctionABI, this.provider);
-    const shipped = await contract.sellerShipped();
-    if (!shipped) throw new BadRequestException('Chưa thấy xác nhận giao hàng trên chain. Đợi 10-30s');
-
-    // CẬP NHẬT TRẠNG THÁI THÀNH "SHIPPED"
-    await this.prisma.auction.update({
-      where: { id: auction.id },
-      data: { status: 'Shipped' },
-    });
-
-    // Ghi log (chống trùng txHash)
-    const exist = await this.prisma.transaction.findUnique({ where: { txHash } });
-    if (!exist) {
-      await this.prisma.transaction.create({
-        data: {
-          txHash,
-          type: 'shipped',
-          amount: 0,
-          user: { connect: { id: userId } },
-          auction: { connect: { id: auction.id } },
-        },
-      });
-    }
-
-    return { success: true, message: 'Đã xác nhận giao hàng! Chờ người mua nhận hàng.' };
-  }
+  
 
   // TÍNH TỔNG DOANH THU CỦA MỘT SELLER
   async getSellerRevenue(sellerId: number) {

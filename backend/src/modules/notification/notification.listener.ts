@@ -208,20 +208,41 @@ export class NotificationListener implements OnModuleInit {
     // ---------- 8. Payment Completed ----------
     this.eventEmitter.on('payment.completed', async (payload: any) => {
       try {
-        if (!payload?.sellerId || !payload?.auctionId) return;
+        if (!payload?.auctionId) return;
 
-        await this.prisma.notification.create({
-          data: {
-            user: { connect: { id: payload.sellerId } },
-            title: 'Payment Completed',
-            message: `Buyer has completed payment for "${payload.title ?? 'Untitled'}".`,
-            image: payload.image ?? null,
-            link: payload.link ? `${payload.link}` : `/auction/${payload.auctionId}`,
-            type: 'PAYMENT_COMPLETED',
-            targetType: 'auction',
-            targetId: payload.auctionId,
-          },
-        });
+        // Gửi cho SELLER (người bán)
+        if (payload.sellerId) {
+          await this.prisma.notification.create({
+            data: {
+              user: { connect: { id: payload.sellerId } },
+              title: 'Đã nhận thanh toán',
+              message: `Người mua đã thanh toán thành công! Vui lòng giao hàng trong vòng 7 ngày.`,
+              image: payload.image ?? null,
+              link: `/user/my_auction`,
+              type: 'PAYMENT_RECEIVED',
+              targetType: 'auction',
+              targetId: payload.auctionId,
+            },
+          });
+        }
+
+        // Gửi cho BUYER (người mua)
+        if (payload.buyerId) {
+          await this.prisma.notification.create({
+            data: {
+              user: { connect: { id: payload.buyerId } },
+              title: 'Thanh toán thành công',
+              message: `Bạn đã thanh toán thành công! Vui lòng chờ người bán giao hàng.`,
+              image: payload.image ?? null,
+              link: `/user/winning_auction`,
+              type: 'PAYMENT_SUCCESS',
+              targetType: 'auction',
+              targetId: payload.auctionId,
+            },
+          });
+        }
+
+        this.logger.log(`Sent payment.completed notification to both parties: ${payload.auctionId}`);
       } catch (err: any) {
         this.logger.error(`Error handling payment.completed: ${err?.message ?? err}`);
       }
@@ -246,6 +267,100 @@ export class NotificationListener implements OnModuleInit {
         });
       } catch (err: any) {
         this.logger.error(`Error handling admin.message: ${err?.message ?? err}`);
+      }
+    });
+    // ---------- 10. Seller Bị Phạt (PenalizedSeller) ----------
+    this.eventEmitter.on('auction.penalizedSeller', async (payload: any) => {
+      try {
+        if (!payload?.sellerId || !payload?.auctionId) return;
+
+        await this.prisma.notification.create({
+          data: {
+            user: { connect: { id: payload.sellerId } },
+            title: 'You Have Been Penalized',
+            message: `You did not ship the item for auction "${payload.title ?? 'Untitled'}". Your deposit has been deducted.`,
+            image: payload.image ?? null,
+            link: `/user/my_auction`,
+            type: 'PENALIZED_SELLER',
+            targetType: 'auction',
+            targetId: payload.auctionId,
+          },
+        });
+
+        this.logger.log(`Sent PENALIZED_SELLER notification to seller ${payload.sellerId}`);
+      } catch (err: any) {
+        this.logger.error(`Error handling auction.penalizedSeller: ${err?.message ?? err}`);
+      }
+    });
+
+    // ---------- 11. Winner Bị Phạt (Penalized) ----------
+    this.eventEmitter.on('auction.penalizedBuyer', async (payload: any) => {
+      try {
+        if (!payload?.buyerId || !payload?.auctionId) return;
+
+        await this.prisma.notification.create({
+          data: {
+            user: { connect: { id: payload.buyerId } },
+            title: 'Payment Failed – You Have Been Penalized',
+            message: `You did not complete payment for "${payload.title ?? 'Untitled'}". Your bid has been forfeited.`,
+            image: payload.image ?? null,
+            link: `/user/winning_auction`,
+            type: 'PENALIZED_BUYER',
+            targetType: 'auction',
+            targetId: payload.auctionId,
+          },
+        });
+
+        this.logger.log(`Sent PENALIZED_BUYER notification to buyer ${payload.buyerId}`);
+      } catch (err: any) {
+        this.logger.error(`Error handling auction.penalizedBuyer: ${err?.message ?? err}`);
+      }
+    });
+    // ---------- 12. Seller đã giao hàng (Shipped) ----------
+    this.eventEmitter.on('auction.shipped', async (payload: any) => {
+      try {
+        if (!payload?.buyerId || !payload?.auctionId) return;
+
+        await this.prisma.notification.create({
+          data: {
+            user: { connect: { id: payload.buyerId } },
+            title: 'Hàng đã được giao',
+            message: `Người bán đã xác nhận giao hàng cho "${payload.title ?? 'đấu giá'}". Vui lòng kiểm tra và xác nhận nhận hàng.`,
+            image: payload.image ?? null,
+            link: `/user/winning_auction`,
+            type: 'ITEM_SHIPPED',
+            targetType: 'auction',
+            targetId: payload.auctionId,
+          },
+        });
+
+        this.logger.log(`Sent ITEM_SHIPPED notification to buyer ${payload.buyerId}`);
+      } catch (err: any) {
+        this.logger.error(`Error handling auction.shipped: ${err?.message ?? err}`);
+      }
+    });
+
+    // ---------- 13. Buyer đã nhận hàng (Completed) ----------
+    this.eventEmitter.on('auction.completed', async (payload: any) => {
+      try {
+        if (!payload?.sellerId || !payload?.auctionId) return;
+
+        await this.prisma.notification.create({
+          data: {
+            user: { connect: { id: payload.sellerId } },
+            title: 'Giao dịch hoàn tất',
+            message: `Người mua đã xác nhận nhận hàng thành công! Tiền đã được chuyển vào ví của bạn.`,
+            image: payload.image ?? null,
+            link: `/user/my_auction`,
+            type: 'TRANSACTION_COMPLETED',
+            targetType: 'auction',
+            targetId: payload.auctionId,
+          },
+        });
+
+        this.logger.log(`Sent TRANSACTION_COMPLETED notification to seller ${payload.sellerId}`);
+      } catch (err: any) {
+        this.logger.error(`Error handling auction.completed: ${err?.message ?? err}`);
       }
     });
   }

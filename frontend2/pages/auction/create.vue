@@ -423,7 +423,7 @@ const onSubmit = async () => {
     await createItem(formData)
 
     alert('Gửi duyệt thành công! Vui lòng chờ Admin duyệt.')
-    router.push('/my-items') // ← Chuyển sang trang My Items để xem trạng thái
+    router.push('/user/my_auction') // ← Chuyển sang trang My Items để xem trạng thái
   } catch (err: any) {
     alert('Lỗi: ' + (err.message || 'Không thể gửi duyệt'))
   } finally {

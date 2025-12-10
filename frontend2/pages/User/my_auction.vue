@@ -11,7 +11,7 @@
         </p>
       </div>
 
-      <!-- TABS – GIỮ NGUYÊN ĐẸP NHƯ CŨ -->
+      <!-- TABS -->
       <div class="border-b border-gray-200 mb-10">
         <div class="flex flex-wrap gap-x-8 gap-y-4 -mb-px">
           <button
@@ -50,7 +50,7 @@
         </button>
       </div>
 
-      <!-- DANH SÁCH – ẢNH HIỂN THỊ ĐÚNG ĐƯỜNG DẪN /uploads/ -->
+      <!-- DANH SÁCH -->
       <div v-else class="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
         <div
           v-for="item in displayedItems"
@@ -58,7 +58,6 @@
           class="bg-white shadow hover:shadow-lg transition-shadow duration-300 border border-gray-200 overflow-hidden"
         >
           <div class="relative h-64 bg-gray-100">
-            <!-- ĐÃ SỬA: DÙNG HÀM getImageUrl ĐỂ HIỂN THỊ ẢNH ĐÚNG -->
             <img
               v-if="getImageUrl(item)"
               :src="getImageUrl(item)"
@@ -70,8 +69,6 @@
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 16a2 2 0 012.828 0L20 16m-6-4v1" />
               </svg>
             </div>
-
-            <!-- Badge trạng thái -->
             <div class="absolute top-3 right-3">
               <span
                 class="px-3 py-1 text-xs font-bold text-white shadow"
@@ -125,15 +122,17 @@
                 Xem chi tiết
               </button>
 
+              <!-- NÚT THANH TOÁN – HIỆN MODAL CHÍNH SÁCH -->
               <button
                 v-if="item.status === 'approved' && !item.auction"
-                @click="handlePayment(item)"
+                @click="openPaymentModal(item)"
                 class="flex-1 py-3 bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white font-bold shadow-lg transition"
                 :disabled="isActing"
               >
                 {{ isActing ? 'Đang xử lý...' : 'Thanh toán & Tạo đấu giá' }}
               </button>
 
+              <!-- NÚT XÁC NHẬN GIAO/NHẬN HÀNG -->
               <template v-else-if="canAct(item)">
                 <button
                   @click="handleAction(item)"
@@ -157,6 +156,79 @@
         </div>
       </div>
     </div>
+
+    <!-- MODAL CHÍNH SÁCH + CHECKBOX "TÔI CHẤP NHẬN" -->
+    <teleport to="body">
+      <div v-if="showPolicyModal" class="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+        <div class="bg-white shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+          <div class="p-8">
+            <div class="flex justify-between items-start mb-6">
+              <h2 class="text-2xl font-bold text-gray-900">Chính sách & Điều khoản đấu giá</h2>
+              <button @click="showPolicyModal = false" class="text-gray-400 hover:text-gray-600 transition">
+                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div class="prose prose-lg text-gray-700 space-y-4">
+              <p>Khi bấm <strong>Thanh toán & Tạo đấu giá</strong>, bạn đồng ý với các điều khoản sau:</p>
+              <ul class="list-disc pl-6 space-y-3">
+                <li>Bạn sẽ đặt cọc <strong>20% giá khởi điểm</strong> (không hoàn lại nếu không giao hàng)</li>
+                <li>Nếu không giao hàng đúng hạn → mất toàn bộ cọc</li>
+                <li>Nếu người mua không thanh toán → mất tiền cọc của họ</li>
+                <li>Tất cả giao dịch được ghi trên blockchain → không thể hủy, không thể sửa</li>
+                <li>Phí gas do bạn tự chịu</li>
+              </ul>
+
+              <div class="bg-red-50 border border-red-200 p-4 mt-6">
+                <p class="font-bold text-red-800">CẢNH BÁO:</p>
+                <p class="text-red-700 mt-1">Sau khi xác nhận, giao dịch sẽ được gửi lên blockchain ngay lập tức và <strong>KHÔNG THỂ HỦY</strong>!</p>
+              </div>
+            </div>
+
+            <!-- CHECKBOX CHẤP NHẬN -->
+            <div class="mt-8 flex items-center gap-4">
+              <input
+                v-model="acceptPolicy"
+                type="checkbox"
+                id="accept-policy"
+                class="w-6 h-6 text-blue-600 rounded focus:ring-blue-500"
+              />
+              <label for="accept-policy" class="text-lg font-medium text-gray-900 cursor-pointer select-none">
+                Tôi đã đọc và chấp nhận toàn bộ chính sách & điều khoản trên
+              </label>
+            </div>
+
+            <!-- NÚT XÁC NHẬN -->
+            <div class="mt-8 flex justify-end gap-4">
+              <button
+                @click="showPolicyModal = false"
+                class="px-8 py-3 border border-gray-300 text-gray-700 hover:bg-gray-100 font-medium transition"
+              >
+                Hủy bỏ
+              </button>
+              <button
+                @click="confirmAndPay"
+                :disabled="!acceptPolicy || isActing"
+                class="px-10 py-3 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-bold shadow-lg transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-3"
+              >
+                <span v-if="isActing" class="flex items-center gap-2">
+                  <svg class="w-6 h-6 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Đang xử lý...
+                </span>
+                <span v-else>
+                  Xác nhận & Thanh toán ngay
+                </span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </teleport>
   </div>
 </template>
 
@@ -181,6 +253,23 @@ const auctions = ref<any[]>([])
 const isActing = ref(false)
 const currentUserAddress = ref<string>('')
 
+// ==================== MODAL THANH TOÁN ====================
+const showPolicyModal = ref(false)
+const acceptPolicy = ref(false)
+const pendingItem = ref<any>(null)
+
+const openPaymentModal = (item: any) => {
+  pendingItem.value = item
+  acceptPolicy.value = false
+  showPolicyModal.value = true
+}
+
+const confirmAndPay = async () => {
+  if (!acceptPolicy.value || !pendingItem.value) return
+  showPolicyModal.value = false
+  await handlePayment(pendingItem.value)
+  pendingItem.value = null
+}
 // ==================== TABS ====================
 const tabs = [
   { key: 'all',           label: 'Tất cả',                     count: 0 },
@@ -210,7 +299,7 @@ const statusConfig: any = {
 // ==================== HELPER FUNCTIONS ====================
 // Hiển thị ảnh đúng đường dẫn /uploads/
 const getImageUrl = (item: any): string => {
-  const image = item.mainImage || item.item?.item?.mainImage
+  const image = item.mainImage || item.item?.mainImage
   return image ? `http://localhost:3001/uploads/${image}` : '/no-image.jpg'
 }
 
@@ -298,10 +387,12 @@ const updateTabCounts = () => {
 
 // ==================== DISPLAYED ITEMS ====================
 const displayedItems = computed(() => {
-  if (activeTab.value === 'all') return [...items.value, ...auctions.value]
-  if (activeTab.value === 'pending') return items.value.filter(i => i.status === 'pending')
-  if (activeTab.value === 'approved') return items.value.filter(i => i.status === 'approved' && !i.auction)
-  return auctions.value.filter(a => a.status === activeTab.value)
+  const all = [...items.value, ...auctions.value]
+  
+  return all.filter(item => {
+    const status = getItemStatus(item)
+    return status !== null && status !== 'unknown'
+  })
 })
 
 // ==================== THANH TOÁN & TẠO ĐẤU GIÁ ====================
@@ -314,28 +405,39 @@ const handlePayment = async (item: any) => {
     const provider = new ethers.providers.Web3Provider(window.ethereum)
     await provider.send('eth_requestAccounts', [])
     const signer = provider.getSigner()
+    const userAddress = await signer.getAddress()
 
     const factoryAddress = '0x5FbDB2315678afecb367f032d93F642f64180aa3'
     const factoryABI = [
       'function createAction(uint256 _biddingTime, address _seller, uint256 _startingPrice) payable',
       'event ActionCreated(address indexed seller, address actionAddress, uint startingPrice, uint sellerDeposit, uint endTime)'
     ]
-
     const factory = new ethers.Contract(factoryAddress, factoryABI, signer)
+
     const startingPriceWei = ethers.utils.parseEther(item.startingPrice.toString())
+    
+    
+    const listingFee = ethers.utils.parseEther("5") // ← ĐÂY LÀ TIỀN THẬT!
+
+    // CỌC 20% + PHÍ LISTING
     const depositWei = startingPriceWei.mul(20).div(100)
+    const totalValue = depositWei.add(listingFee) // ← TRỪ TIỀN THẬT!
+
     const biddingTime = item.duration * 60
 
     const tx = await factory.createAction(
       biddingTime,
-      await signer.getAddress(),
+      userAddress,
       startingPriceWei,
-      { value: depositWei, gasLimit: 5000000 }
+      { 
+        value: totalValue, // ← GỬI CẢ CỌC + PHÍ LISTING
+        gasLimit: 6000000 
+      }
     )
 
-    alert(`Đang tạo đấu giá... Cọc: ${ethers.utils.formatEther(depositWei)} ETH`)
-    const receipt = await tx.wait()
+    alert(`Đang tạo đấu giá...\nCọc: ${ethers.utils.formatEther(depositWei)} ETH\nPhí listing: ${ethers.utils.formatEther(listingFee)} ETH\nTổng: ${ethers.utils.formatEther(totalValue)} ETH`)
 
+    const receipt = await tx.wait()
     const iface = new ethers.utils.Interface(factoryABI)
     const event = receipt.logs
       .map(log => { try { return iface.parseLog(log) } catch { return null } })
@@ -345,11 +447,15 @@ const handlePayment = async (item: any) => {
     const contractAddress = event.args.actionAddress
 
     await createAuctionFromItem(item.id, contractAddress, tx.hash)
-    alert('Tạo đấu giá thành công!')
-    await Promise.all([loadItems(), loadAuctions()])
+    alert('Tạo đấu giá thành công! Đã trừ phí listing.')
+
+    items.value = items.value.filter(i => i.id !== item.id)
+    await loadAuctions()
     router.push(`/auction/${contractAddress}`)
+
   } catch (err: any) {
-    alert('Lỗi: ' + (err.message || 'Thanh toán thất bại'))
+    console.error(err)
+    alert('Lỗi: ' + (err.message || 'Tạo đấu giá thất bại'))
   } finally {
     isActing.value = false
   }
@@ -398,9 +504,24 @@ const handleAction = async (item: any) => {
 
 // ==================== TRẠNG THÁI & NÚT – HOÀN HẢO NHẤT ====================
 const getItemStatus = (item: any) => {
-  if (item.status === 'pending') return 'pending'
-  if (item.status === 'approved' && !item.auction) return 'approved'
-  return item.auction?.status || item.status || 'unknown'
+  // ƯU TIÊN 1: Nếu là item thuần (không có auction)
+  if (!item.auction && item.status) {
+    if (item.status === 'pending') return 'pending'
+    if (item.status === 'approved') return 'approved'
+  }
+
+  // ƯU TIÊN 2: Nếu có auction → dùng status của auction
+  if (item.auction?.status) {
+    return item.auction.status
+  }
+
+  // ƯU TIÊN 3: Nếu item có status rõ ràng
+  if (item.status && ['Active', 'Ended', 'Paid', 'Shipped', 'Completed', 'Penalized', 'PenalizedSeller'].includes(item.status)) {
+    return item.status
+  }
+
+  // Mọi trường hợp khác → không hiển thị (bị loại ở displayedItems)
+  return null
 }
 
 const canAct = computed(() => (item: any) => {
