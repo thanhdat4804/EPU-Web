@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "public"."User" ADD COLUMN     "rate" DOUBLE PRECISION NOT NULL DEFAULT 5.0;

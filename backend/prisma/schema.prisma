@@ -24,7 +24,7 @@ model User {
   addresses     UserAddress[]       // ← NHIỀU ĐỊA CHỈ
   defaultAddress UserAddress? @relation("DefaultAddress", fields: [defaultAddressId], references: [id]) 
   defaultAddressId Int?  @unique       // ← Lưu ID của địa chỉ mặc định
-
+  rate          Float    @default(5.0)
   items         Item[]
   auctions      Auction[] @relation("SellerAuctions")
   bids          Bid[]
