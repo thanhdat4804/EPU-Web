@@ -12,7 +12,7 @@ contract Action {
     bool public buyerPaid;
     bool public sellerShipped;
     bool public buyerConfirmed;
-
+    
     uint public constant BUYER_DEPOSIT_RATE = 10;   // 10% của bid
     uint public constant SELLER_DEPOSIT_RATE = 20;  // 20% của startingPrice
     uint public constant CONFIRM_WINDOW = 60;       // test: 60s (live: 7 days)
